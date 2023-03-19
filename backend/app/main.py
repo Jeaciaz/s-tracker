@@ -1,15 +1,15 @@
 from fastapi import FastAPI
 
-from .spending import router as spending_router
-from .category import router as categories_router
+from .spendings import router as spendings_router
+from .spending_groups import router as spending_groups_router
 from .database import Base, engine
 
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI()
 
-app.include_router(categories_router.router)
-app.include_router(spending_router.router)
+app.include_router(spending_groups_router.router)
+app.include_router(spendings_router.router)
 
 @app.get('/ping')
 def ping():
