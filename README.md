@@ -3,20 +3,23 @@ This is a personal project for me and my family to track expenses and plan our b
 
 ## Set up & launch backend
 Enter backend directory:
-`cd backend`
+
+```cd backend```
 
 Install requirements (probably in a virtual environment):
-`pip install -r requirements.txt`
+
+```pip install -r requirements.txt```
 
 Run the server:
 
-`uvicorn app.main:app --reload`
+```uvicorn app.main:app --reload```
 
 **TODO**: do this using Docker.
 
 ## Run tests
-After `cd backend`:
-`pytest .`
+After doing `cd backend`:
+
+```pytest .```
 
 ## Tech stack
 This project uses:
