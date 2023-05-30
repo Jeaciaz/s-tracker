@@ -6,7 +6,7 @@ from .database import Base, engine
 
 Base.metadata.create_all(bind=engine)
 
-def make_app():
+def make_app() -> FastAPI:
     app = FastAPI()
 
     app.include_router(spending_sinks_router.router)

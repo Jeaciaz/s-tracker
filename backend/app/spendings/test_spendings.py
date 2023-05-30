@@ -1,6 +1,6 @@
 import datetime
 
-from fastapi import FastAPI
+from fastapi.testclient import TestClient
 
 from .schemas import Spending
 from ..spending_sinks.test_spending_sinks import get_spending_sinks
@@ -12,11 +12,11 @@ test_spending = {
 }
 
 
-def get_spendings(client: FastAPI):
+def get_spendings(client: TestClient):
     return client.get('/spendings')
 
 
-def test_create_spending(client: FastAPI):
+def test_create_spending(client: TestClient):
     sink = get_spending_sinks(client).json()[0]
     response = client.post(f'/spendings/{sink["id"]}', json=test_spending)
 
@@ -26,7 +26,7 @@ def test_create_spending(client: FastAPI):
     assert any(spending == data for spending in get_spendings(client).json())
 
 
-def test_get_spendings(client: FastAPI):
+def test_get_spendings(client: TestClient):
     response = get_spendings(client)
 
     assert response.status_code == 200, response.text
@@ -35,7 +35,7 @@ def test_get_spendings(client: FastAPI):
     assert all(Spending.validate(spending) for spending in spendings)
 
 
-def test_put_spendings(client: FastAPI):
+def test_put_spendings(client: TestClient):
     spending = get_spendings(client).json()[0]
     test_spending_with_ids = test_spending | {
         'id': spending['id'],
@@ -51,7 +51,7 @@ def test_put_spendings(client: FastAPI):
     assert any(spending_data == test_spending_with_ids for spending_data in spendings)
 
 
-def test_delete_spendings(client: FastAPI):
+def test_delete_spendings(client: TestClient):
     spending_id = get_spendings(client).json()[0]['id']
     response = client.delete(f'/spendings/{spending_id}')
 

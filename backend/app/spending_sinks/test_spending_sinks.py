@@ -1,4 +1,4 @@
-from fastapi import FastAPI
+from fastapi.testclient import TestClient
 
 from . import schemas
 
@@ -10,15 +10,15 @@ test_sink = {
 }
 
 
-def get_spending_sinks(client: FastAPI):
+def get_spending_sinks(client: TestClient):
     return client.get('/spending-sinks')
 
 
-def create_spending_sink(client: FastAPI):
+def create_spending_sink(client: TestClient):
     return client.post('/spending-sinks', json=test_sink)
 
 
-def test_create_spending_sink(client: FastAPI):
+def test_create_spending_sink(client: TestClient):
     """Tests whether the route to create a sink actually does so."""
     response = create_spending_sink(client)
     print(response.status_code)
@@ -34,7 +34,7 @@ def test_create_spending_sink(client: FastAPI):
     assert any(sink['id'] == spending_sink_id for sink in get_data)
 
 
-def test_get_spending_sinks(client: FastAPI):
+def test_get_spending_sinks(client: TestClient):
     """Tests that the route to retrieve all sinks returns a proper list."""
     response = get_spending_sinks(client)
     assert response.status_code == 200, response.text
@@ -43,7 +43,7 @@ def test_get_spending_sinks(client: FastAPI):
     assert all(schemas.SpendingSink.validate(sink) for sink in data)
 
 
-def test_put_spending_sinks(client: FastAPI):
+def test_put_spending_sinks(client: TestClient):
     sink_id = get_spending_sinks(client).json()[0]['id']
 
     response = client.put(f'/spending-sinks/{sink_id}', json=test_sink)
@@ -53,7 +53,7 @@ def test_put_spending_sinks(client: FastAPI):
     assert any(sink == test_sink | {"id": sink_id} for sink in all_sinks)
 
 
-def test_delete_spending_sinks(client: FastAPI):
+def test_delete_spending_sinks(client: TestClient):
     all_sinks = get_spending_sinks(client).json()
     sink_id = all_sinks[0]['id']
     response = client.delete(f'/spending-sinks/{sink_id}')

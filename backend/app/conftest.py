@@ -66,7 +66,7 @@ def db_session():
 
 
 @pytest.fixture
-def client(app: FastAPI, db_session: TestingSessionLocal):
+def client(app: FastAPI, db_session: Session):
     def get_test_db():
         try:
             yield db_session
