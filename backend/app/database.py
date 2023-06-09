@@ -1,11 +1,8 @@
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker, DeclarativeBase
+import sqlalchemy as sa
 
-SQLALCHEMY_DATABASE_URL = 'sqlite:///../sqlite.db'
+from .config import DB_URL
 
-engine = create_engine(SQLALCHEMY_DATABASE_URL, echo=True)
-SessionLocal = sessionmaker(autoflush=False)
-SessionLocal.configure(bind=engine)
+print(f"Connecting to database at: {DB_URL}")
 
-class Base(DeclarativeBase):
-    ...
+engine = sa.create_engine(DB_URL, echo=True)
+metadata_obj = sa.MetaData()

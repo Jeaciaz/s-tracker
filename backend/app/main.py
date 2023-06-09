@@ -1,16 +1,13 @@
 from fastapi import FastAPI
 
-from .spendings import router as spendings_router
-from .spending_sinks import router as spending_sinks_router
-from .database import Base, engine
-
-Base.metadata.create_all(bind=engine)
+from .routers import funnels, spendings
+from .database import metadata_obj, engine
 
 def make_app() -> FastAPI:
     app = FastAPI()
 
-    app.include_router(spending_sinks_router.router)
-    app.include_router(spendings_router.router)
+    app.include_router(funnels.router)
+    app.include_router(spendings.router)
 
     return app
 

@@ -1,8 +1,12 @@
-from .database import SessionLocal
+from .database import engine
 
-def get_db():
-  db = SessionLocal()
-  try:
-    yield db
-  finally:
-    db.close()
+from .dao.funnels import FunnelDAO
+from .dao.spendings import SpendingDAO
+
+def get_funnel_dao():
+    with engine.begin() as conn:
+        yield FunnelDAO(conn, SpendingDAO(conn))
+
+def get_spending_dao():
+    with engine.begin() as conn:
+        yield SpendingDAO(conn)

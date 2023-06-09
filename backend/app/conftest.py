@@ -1,79 +1,83 @@
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker, Session
+import sqlalchemy as sa
 from sqlalchemy.pool import StaticPool
 
 from datetime import datetime
 from uuid import uuid4
 
-from .database import Base
-from .dependencies import get_db
+from .database import metadata_obj
+from .lib.monthly_period import ms_timestamp
 from .main import make_app
-from . import spending_sinks, spendings
+from .dao.funnels import *
+from .dto.funnels import *
+from .dependencies import *
+from .dao.spendings import *
+from .dto.spendings import *
 
 SQLALCHEMY_TEST_URL = 'sqlite://'
 
-engine = create_engine(
+engine = sa.create_engine(
     SQLALCHEMY_TEST_URL, connect_args={"check_same_thread": False}, poolclass=StaticPool
 )
-TestingSessionLocal = sessionmaker(autoflush=False, bind=engine)
+
 now = datetime.now()
 
 
-def insert_test_data(db: Session):
+def insert_test_data(conn: sa.Connection):
     for ss in range(3):
         ss_id = uuid4()
-        db.add(spending_sinks.models.SpendingSink(
-            id=ss_id,
-            name=f'Test #{ss}',
-            limit=20000,
-            color='rgb(235, 172, 12)',
-            emoji='🎀',
-        ))
-
+        conn.execute(sa.insert(funnels_table).values({
+                                                     'id': str(ss_id),
+                                                     'name': f'Test #{ss}',
+                                                     'limit': 20000,
+                                                     'color': 'rgb(235,172,12)',
+                                                     'emoji': '🎀'
+                                                     }))
         for s in range(3):
-            db.add(spendings.models.Spending(
-                id=uuid4(),
-                amount=(s+1)*50,
-                datetime=now,
-                spending_sink_id=ss_id
-            ))
-    db.commit()
+            s_id = uuid4()
+            conn.execute(sa.insert(spendings_table).values({
+                                                           'id': str(s_id),
+                                                           'amount': 50 * (s + 2),
+                                                           'timestamp': ms_timestamp(datetime.now()),
+                                                           'funnel_id': str(ss_id),
+                                                           }))
+    conn.commit()
 
 
 @pytest.fixture
 def app():
     """Create a fresh DB for each test case"""
-    Base.metadata.create_all(bind=engine)
+    metadata_obj.create_all(bind=engine)
     _app = make_app()
     yield _app
-    Base.metadata.drop_all(bind=engine)
+    metadata_obj.drop_all(bind=engine)
 
 
 @pytest.fixture
-def db_session():
-    """Create a fresh SQLAlchemy session for each test case. The transaction is rolled back after each test."""
-    connection = engine.connect()
-    transaction = connection.begin()
-    session = TestingSessionLocal(bind=connection)
-    insert_test_data(session)
-    yield session
-    session.close()
-    transaction.rollback()
-    connection.close()
+def db_connection():
+    """Create a fresh SQLAlchemy connection for each test case. The transaction is rolled back after each test."""
+    with engine.connect() as conn:
+        insert_test_data(conn)
+        yield conn
 
 
 @pytest.fixture
-def client(app: FastAPI, db_session: Session):
-    def get_test_db():
+def client(app: FastAPI, db_connection: sa.Connection):
+    def get_test_funnel_dao():
         try:
-            yield db_session
+            yield FunnelDAO(db_connection, SpendingDAO(db_connection))
+        finally:
+            pass
+    def get_test_spending_dao():
+        try:
+            yield SpendingDAO(db_connection)
         finally:
             pass
 
-    app.dependency_overrides[get_db] = get_test_db
+    app.dependency_overrides[get_funnel_dao] = get_test_funnel_dao
+    app.dependency_overrides[get_spending_dao] = get_test_spending_dao
 
     with TestClient(app) as client:
         yield client
