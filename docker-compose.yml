@@ -2,7 +2,8 @@ version: "3.9"
 services:
   restapi_xtracker:
     build: ./backend
+    entrypoint: /backend/docker-entry.sh
     ports:
-      - "80:80"
+      - "8080:8080"
     volumes:
       - ./backend/db:/db
