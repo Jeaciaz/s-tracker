@@ -1,0 +1,17 @@
+;; shadow-cljs configuration
+{:deps true
+
+ :builds
+ {:app
+  {:target     :browser
+   :output-dir "resources/public/js/compiled"
+   :asset-path "/js/compiled"
+   
+   :modules    {:main
+                {:entries [xtracker.core]}}
+
+   :devtools   {:before-load xtracker.core/stop
+                :after-load xtracker.core/start
+                :http-root "resources/public"
+                :http-port 3000
+                :preloads [devtools.preload]}}}}
