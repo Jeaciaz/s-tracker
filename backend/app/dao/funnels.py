@@ -9,7 +9,7 @@ from .tables import funnels_table
 from ..database import *
 from ..dto.funnels import *
 from ..exceptions import FunnelDoesNotExistException
-from ..lib.monthly_period import get_current_period_start
+from ..lib.monthly_period import *
 
 
 class FunnelDAO(BaseDAO):
@@ -18,8 +18,14 @@ class FunnelDAO(BaseDAO):
         self._spendingDao = spendingDao
 
     def from_row(self, row: dict) -> FunnelPublic:
-        spendings = self._spendingDao.get_all(timestamp_from=get_current_period_start())
-        return FunnelPublic(**row | {'remaining': row['limit'] - sum(map(lambda spending: spending.amount, spendings))})
+        spendings = [spending.amount for spending 
+            in self._spendingDao.get_all(timestamp_from=get_current_period_start())
+            if str(spending.funnel_id) == row['id']
+        ]
+        remaining = row['limit'] - sum(spendings)
+        return FunnelPublic(**row | {'remaining': remaining, 
+                                     'daily': remaining - (row['limit'] * get_current_period_remaining_days() / get_current_period_length()),
+                                    })
 
     def get_all(self) -> list[FunnelPublic]:
         result = self._connection.execute(sa.select(funnels_table)).all()

@@ -9,6 +9,7 @@ class FunnelPublic(BaseModel):
     emoji: str
     id: UUID4
     remaining: float
+    daily: float
 
     def dict(self, *args, **kwargs):
         return {**super().dict(*args, **kwargs), 'color': self.color.as_hex(), 'id': str(self.id)}
