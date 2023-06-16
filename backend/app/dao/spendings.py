@@ -7,14 +7,14 @@ import sqlalchemy as sa
 from ..database import metadata_obj
 from ..dto.spendings import *
 from ..exceptions import SpendingDoesNotExistException
-from ..lib.monthly_period import ms_timestamp
+from ..lib.monthly_period import *
 from .base import BaseDAO
 from .tables import spendings_table
 
 class SpendingDAO(BaseDAO):
     def get_all(self, timestamp_from: int | None = None, timestamp_to: int | None = None, funnel_id: UUID4 | None = None) -> list[SpendingPublic]:
         if timestamp_from is None:
-            timestamp_from = 0
+            timestamp_from = get_current_period_start()
         if timestamp_to is None:
             timestamp_to = ms_timestamp(datetime.now())
 

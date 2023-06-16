@@ -1,5 +1,10 @@
 version: "3.9"
 services:
+  frontend_xtracker:
+    build: ./frontend
+    ports:
+      - "80:80"
+
   restapi_xtracker:
     build: ./backend
     entrypoint: /backend/docker-entry.sh

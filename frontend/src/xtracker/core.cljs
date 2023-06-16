@@ -26,9 +26,10 @@
 
 (defn get-funnels []
   (-> (fetch/get (str settings/base-url "/funnel"))
-      (.then #(-> %
-                  :body
-                  (js->clj {:keywordize-keys true})))))
+      (.then (fn [funnels]
+               (-> funnels
+                   :body
+                   (js->clj {:keywordize-keys true}))))))
 
 (defn get-spendings []
   (-> (fetch/get (str settings/base-url "/spending"))
@@ -60,38 +61,41 @@
   (let [delta-num (if (valid-number? delta) (js/parseFloat delta) 0)]
     [:div.grid.grid-cols-12.gap-2.items-end
       (for [funnel funnels-list]
-        [:<> {:key (:name funnel)}
-          [:div.col-span-2.text-sm (:name funnel)]
-          [:div.col-span-8.text-center.text-lg.relative
-            (if (= 0 delta-num)
-              [:div.pb-1 (:daily funnel)]
-              [:div.pb-1.flex.gap-2.justify-center
-                [:span.text-red-600.line-through (:daily funnel)]
-                [:span (- (:daily funnel) delta-num)]])
-            (for [{:keys [value opacity]} [{:value (- (:remaining funnel) delta-num) :opacity 0.5}
-                                           {:value (:remaining funnel) :opacity 0.17}
-                                           {:value (:limit funnel) :opacity 0.33}]]
-              [:div.absolute.bottom-0.h-1.rounded {:key opacity
-                                                   :style {:background-color (:color funnel)
-                                                           :opacity opacity
-                                                           :width (-> value
-                                                                      (/ (:limit funnel))
-                                                                      (* 100)
-                                                                      (str "%"))}}])]
-          [:div.text-end.col-span-2.text-sm (:remaining funnel)]])]))
+        (let [daily (-> funnel
+                        :daily
+                        (.toFixed 2))]
+          [:<> {:key (:name funnel)}
+            [:div.col-span-2.text-sm (:name funnel)]
+            [:div.col-span-8.text-center.text-lg.relative
+              (if (= 0 delta-num)
+                [:div.pb-1 daily]
+                [:div.pb-1.flex.gap-2.justify-center
+                  [:span.text-red-600.line-through daily]
+                  [:span (- daily delta-num)]])
+              (for [{:keys [value opacity]} [{:value (- (:remaining funnel) delta-num) :opacity 0.5}
+                                             {:value (:remaining funnel) :opacity 0.17}
+                                             {:value (:limit funnel) :opacity 0.33}]]
+                [:div.absolute.bottom-0.h-1.rounded {:key opacity
+                                                     :style {:background-color (:color funnel)
+                                                             :opacity opacity
+                                                             :width (-> value
+                                                                        (/ (:limit funnel))
+                                                                        (* 100)
+                                                                        (str "%"))}}])]
+            [:div.text-end.col-span-2.text-sm (:remaining funnel)]]))]))
 
 
 (defn history [funnels-list spendings]
   "Transaction history. Spendings expects array of maps with keys: [:amount :funnel_id :timestamp]"
   [:div.relative.grow
-    [:div.absolute.inset-0.overflow-y-auto
+    [:div.absolute.inset-0.overflow-y-auto.flex.flex-col-reverse
       (for [spending spendings]
         (let [emoji (:emoji (some #(if (= (:funnel_id spending) (:id %)) %) funnels-list))
               datetime (-> spending
                            :timestamp
                            (dayjs)
                            (.format "HH:mm; DD.MM.YY"))]
-          [:div.flex.gap-2.py-4.border-b.border-slate-200 {:key (:timestamp spending)}
+          [:div.flex.gap-2.py-4.border-b.border-slate-300.dark:border-slate-500 {:key (:timestamp spending)}
             [:div emoji]
             [:div (:amount spending)]
             [:div.ms-auto datetime]]))]])
@@ -114,7 +118,7 @@
     (uix/effect!
       refresh!
       [])
-    [:div.px-4.py-8.flex.flex-col.h-screen
+    [:div.px-4.py-8.flex.flex-col.h-screen.dark:bg-slate-700.dark:text-slate-100
       [:h1.text-4xl "XTracker"]
       [:div.mt-6
         (if (= (:data @funnels-list*) nil) 
@@ -128,7 +132,7 @@
                                     
             [:div 
              (funnels (cons funnel-total (:data @funnels-list*)) @delta*) 
-             [:input.mt-4.py-2.px-1.rounded.border.border-slate-300.w-full.text-2xl 
+             [:input.mt-4.py-2.px-1.rounded.border.border-slate-300.w-full.text-2xl.dark:bg-slate-600.dark:border-0
                {:input-mode "numeric" 
                 :value @delta* 
                 :on-change #(reset! delta* (.. % -target -value))
