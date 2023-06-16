@@ -5,7 +5,7 @@ from .routers import funnels, spendings
 from .database import metadata_obj, engine
 
 allowed_origins = [
-    "http://localhost:3000"
+    "http://51.250.83.250:80"
 ]
 
 def make_app() -> FastAPI:
