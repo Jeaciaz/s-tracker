@@ -5,7 +5,7 @@ from .routers import funnels, spendings
 from .database import metadata_obj, engine
 
 allowed_origins = [
-    "http://51.250.83.250:80"
+    "http://51.250.83.250"
 ]
 
 def make_app() -> FastAPI:
@@ -14,7 +14,13 @@ def make_app() -> FastAPI:
     app.include_router(funnels.router)
     app.include_router(spendings.router)
 
-    app.add_middleware(CORSMiddleware, allow_origins=allowed_origins, allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
+    app.add_middleware(
+        CORSMiddleware, 
+        allow_origins=allowed_origins, 
+        allow_credentials=True, 
+        allow_methods=["*"], 
+        allow_headers=["*"]
+    )
 
     return app
 
