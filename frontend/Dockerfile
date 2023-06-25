@@ -16,4 +16,4 @@ COPY --from=builder /frontend/resources/public /usr/share/nginx/html
 COPY ./nginx/nginx.conf /etc/nginx/nginx.conf
 COPY ./ssl /usr/share
 
-ENTRYPOINT ["nginx", "-g", "daemon off;"]
+ENTRYPOINT ["nginx-debug", "-g", "daemon off;"]
