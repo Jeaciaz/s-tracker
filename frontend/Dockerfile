@@ -13,7 +13,7 @@ FROM nginx:alpine
 RUN rm -rf /usr/share/nginx/html/*
 COPY --from=builder /frontend/resources/public /usr/share/nginx/html
 
-COPY ./.nginx/nginx.conf /etc/nginx/nginx.conf
+COPY ./nginx/nginx.conf /etc/nginx/nginx.conf
 COPY ./ssl /usr/share
 
 ENTRYPOINT ["nginx", "-g", "daemon off;"]
