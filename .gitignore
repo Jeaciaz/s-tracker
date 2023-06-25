@@ -8,6 +8,7 @@ node_modules
 frontend/resources/public/js
 frontend/resources/public/css/compiled.css
 *.pem
+*.crt
 pom.xml
 pom.xml.asc
 *.iml
