@@ -4,6 +4,8 @@ services:
     build: ./frontend
     ports:
       - "80:80"
+    volumes:
+      - /etc/letsencrypt/live/jeaciaz.site:/ssl
 
   restapi_xtracker:
     build: ./backend

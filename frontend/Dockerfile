@@ -14,6 +14,5 @@ RUN rm -rf /usr/share/nginx/html/*
 COPY --from=builder /frontend/resources/public /usr/share/nginx/html
 
 COPY ./nginx/nginx.conf /etc/nginx/nginx.conf
-COPY ./ssl /etc/nginx/certs
 
-ENTRYPOINT ["nginx-debug", "-g", "daemon off;"]
+ENTRYPOINT ["nginx", "-g", "daemon off;"]
