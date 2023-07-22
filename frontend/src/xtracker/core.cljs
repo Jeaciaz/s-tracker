@@ -118,7 +118,7 @@
       refresh!
       [])
     [:div.px-4.py-8.flex.flex-col.h-screen.dark:bg-slate-700.dark:text-slate-100
-      [:h1.text-4xl "XTracker"]
+      [:h1.text-4xl "₪ Tracker"]
       [:div.mt-6
         (if (= (:data @funnels-list*) nil) 
           [:span "loading..."]
