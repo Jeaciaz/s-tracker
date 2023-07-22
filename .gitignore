@@ -10,6 +10,8 @@ frontend/resources/public/css/compiled.css
 *.pem
 *.crt
 *.key
+*.conf
+*.csr
 pom.xml
 pom.xml.asc
 *.iml
