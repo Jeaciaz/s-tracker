@@ -4,15 +4,21 @@
 		<meta charset="UTF-8"/>
 		<meta name="viewport" content="width=device-width, initial-scale=1"/>
 		<meta name="theme-color" content="#334155"/>
-		<link href="css/compiled.css" rel="stylesheet">
 		<link href="manifest.json" rel="manifest">
 		<link href="assets/favicon.ico" rel="favicon">
+		<link href="css/offline.css" rel="stylesheet">
 		<title>₪ Tracker</title>
 	</head>
 	<body>
-		<main id="app"></main>
+		<h1>
+			The page is offline :(
+		</h1>
+		<button id="refresh">Refresh</button>
+		<script>
+			document.getElementById('refresh').addEventListener('click', () => {
+				location.reload()
+			})
+		</script>
 	</body>
-	<script src="js/compiled/main.js"></script>
-	<script type="text/javascript">xtracker.core.init()</script>
-	<script type="text/javascript">if('serviceWorker' in navigator){navigator.serviceWorker.register('sw.js')}</script>
 </html>
+
