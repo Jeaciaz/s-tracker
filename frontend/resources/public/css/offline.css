@@ -30,5 +30,6 @@ button:active {
 @media (prefers-color-scheme: dark) {
 	body {
 		background-color: #334155;
+		color: #fff;
 	}
 }

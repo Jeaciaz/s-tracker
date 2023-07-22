@@ -14,7 +14,9 @@ self.addEventListener('fetch', event => {
 			return caches.match('offline.html')
 		}))
 	}
-	event.respondWith(caches.match(event.request).then(cachedResponse => {
-		return cachedResponse || fetch(event.request)
-	}))
+	else {
+		event.respondWith(caches.match(event.request).then(cachedResponse => {
+			return cachedResponse || fetch(event.request)
+		}))
+	}
 })
