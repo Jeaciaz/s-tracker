@@ -6,7 +6,7 @@
 
     ["dayjs" :as dayjs]
 
-    [xtracker.settings :as settings]))
+    [xtracker.config :as config]))
 
 
 ;; UTILS 
@@ -25,20 +25,20 @@
 
 
 (defn get-funnels []
-  (-> (fetch/get (str settings/base-url "/funnel"))
+  (-> (fetch/get (str config/base-url "/funnel"))
       (.then (fn [funnels]
                (-> funnels
                    :body
                    (js->clj {:keywordize-keys true}))))))
 
 (defn get-spendings []
-  (-> (fetch/get (str settings/base-url "/spending"))
+  (-> (fetch/get (str config/base-url "/spending"))
       (.then #(-> %
                   :body
                   (js->clj {:keywordize-keys true})))))
 
 (defn submit-spending [{:keys [amount funnel-id]}]
-  (-> (fetch/post (str settings/base-url "/spending") 
+  (-> (fetch/post (str config/base-url "/spending") 
                   {:body {:amount amount
                           :timestamp (.now js/Date)
                           :funnel_id funnel-id}
@@ -61,17 +61,16 @@
   (let [delta-num (if (valid-number? delta) (js/parseFloat delta) 0)]
     [:div.grid.grid-cols-12.gap-2.items-end
       (for [funnel funnels-list]
-        (let [daily (-> funnel
-                        :daily
-                        (.toFixed 2))]
+        (let [format-num #(.toFixed % 2)
+              daily (:daily funnel)]
           [:<> {:key (:name funnel)}
             [:div.col-span-2.text-sm (:name funnel)]
             [:div.col-span-8.text-center.text-lg.relative
               (if (= 0 delta-num)
-                [:div.pb-1 daily]
+                [:div.pb-1 (format-num daily)]
                 [:div.pb-1.flex.gap-2.justify-center
-                  [:span.text-red-600.line-through daily]
-                  [:span (- daily delta-num)]])
+                  [:span.text-red-600.line-through (format-num daily)]
+                  [:span (format-num (- daily delta-num))]])
               (for [{:keys [value opacity]} [{:value (- (:remaining funnel) delta-num) :opacity 0.5}
                                              {:value (:remaining funnel) :opacity 0.17}
                                              {:value (:limit funnel) :opacity 0.33}]]
@@ -89,16 +88,17 @@
   "Transaction history. Spendings expects array of maps with keys: [:amount :funnel_id :timestamp]"
   [:div.relative.grow
     [:div.absolute.inset-0.overflow-y-auto.flex.flex-col-reverse
+      [:div.mb-auto]
       (for [spending spendings]
         (let [emoji (:emoji (some #(if (= (:funnel_id spending) (:id %)) %) funnels-list))
               datetime (-> spending
                            :timestamp
                            (dayjs)
                            (.format "HH:mm; DD.MM.YY"))]
-          [:div.flex.gap-2.py-4.border-b.border-slate-300.dark:border-slate-500 {:key (:timestamp spending)}
-            [:div emoji]
-            [:div (:amount spending)]
-            [:div.ms-auto datetime]]))]])
+             [:div.flex.gap-2.py-4.border-b.border-slate-300.dark:border-slate-500 {:key (:timestamp spending)}
+               [:div emoji]
+               [:div (:amount spending)]
+               [:div.ms-auto datetime]]))]])
     
 
 (defn app []
@@ -123,7 +123,7 @@
       [:div.mt-6
         (if (= (:data @funnels-list*) nil) 
           [:span "loading..."]
-          (let [funnel-total (into settings/funnel-total-visuals
+          (let [funnel-total (into config/funnel-total-visuals
                                    (reduce sum-funnel-values 
                                            {:limit 0
                                             :remaining 0
