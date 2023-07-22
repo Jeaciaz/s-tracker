@@ -23,22 +23,21 @@
 
 ;; DATA FETCHING
 
-
 (defn get-funnels []
-  (-> (fetch/get (str config/base-url "/funnel"))
+  (-> (fetch/get (str config/base-url "/funnel/"))
       (.then (fn [funnels]
                (-> funnels
                    :body
                    (js->clj {:keywordize-keys true}))))))
 
 (defn get-spendings []
-  (-> (fetch/get (str config/base-url "/spending"))
+  (-> (fetch/get (str config/base-url "/spending/"))
       (.then #(-> %
                   :body
                   (js->clj {:keywordize-keys true})))))
 
 (defn submit-spending [{:keys [amount funnel-id]}]
-  (-> (fetch/post (str config/base-url "/spending") 
+  (-> (fetch/post (str config/base-url "/spending/") 
                   {:body {:amount amount
                           :timestamp (.now js/Date)
                           :funnel_id funnel-id}
