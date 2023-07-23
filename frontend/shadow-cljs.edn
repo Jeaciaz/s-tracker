@@ -6,6 +6,7 @@
   {:target     :browser
    :output-dir "resources/public/js/compiled"
    :asset-path "/js/compiled"
+   :compiler-options {:optimizations :advanced}
    
    :modules    {:main
                 {:entries [xtracker.core]}}
