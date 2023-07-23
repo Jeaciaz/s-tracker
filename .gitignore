@@ -12,6 +12,7 @@ frontend/resources/public/css/compiled.css
 *.key
 *.conf
 *.csr
+!nginx.conf
 pom.xml
 pom.xml.asc
 *.iml
