@@ -24,6 +24,9 @@ pom.xml.asc
 .nrepl-*
 .DS_Store
 .cpcache
+elm-stuff
+dist
+compiled-styles.css
 
 .hgignore
 .hg/
