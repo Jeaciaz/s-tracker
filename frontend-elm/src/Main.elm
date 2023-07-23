@@ -16,6 +16,7 @@ import Utils
 
 
 
+
 -- MAIN
 
 
@@ -69,7 +70,8 @@ type alias Spendings =
 
 
 type alias Flags =
-  { baseUrl : String }
+    { baseUrl : String }
+
 
 init : Flags -> ( Model, Cmd Msg )
 init { baseUrl } =
@@ -130,7 +132,10 @@ subscriptions _ =
 view : Model -> Html Msg
 view model =
     main_ [ class "px-4 py-8 flex flex-col h-screen dark:bg-slate-700 dark:text-slate-100" ]
-        [ h1 [ class "text-4xl" ] [ text "₪ Tracker" ]
+        [ div [ class "flex justify-between" ]
+            [ h1 [ class "text-4xl" ] [ text "₪ Tracker" ]
+            , button [ class "p-1", onClick ReloadData ] [ img [ alt "", src "/reload.png" ] [] ]
+            ]
         , div [ class "mt-6" ]
             [ viewFunnels model
             , input
@@ -169,7 +174,7 @@ mapWebData model render =
             div [] []
 
         RD.Failure _ ->
-            div [] [ text "error"]
+            div [] [ text "error" ]
 
         RD.Success data ->
             render data
@@ -262,7 +267,6 @@ viewSpendings model =
                     )
                 ]
         )
-
 
 
 getFunnels : String -> Cmd Msg
