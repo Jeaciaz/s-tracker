@@ -16,7 +16,6 @@ import Utils
 
 
 
-
 -- MAIN
 
 
@@ -230,9 +229,9 @@ viewSpendings model =
     mapWebData (RD.map2 (\a b -> ( a, b )) model.funnels model.spendings)
         (\( funnels, spendings ) ->
             div [ class "relative grow" ]
-                [ div [ class "absolute inset-0 overflow-y-auto flex flex-col-reverse" ]
-                    (div [ class "mb-auto" ] []
-                        :: List.map
+                [ div [ class "absolute inset-0 overflow-y-auto flex flex-col" ]
+                    (List.reverse <|
+                        List.map
                             (\spending ->
                                 let
                                     emoji =
@@ -252,7 +251,7 @@ viewSpendings model =
                                     time =
                                         spending.timestamp
                                             |> Time.millisToPosix
-                                            |> (\t -> formatTimeUnit (Time.toMinute model.tz t) ++ ":" ++ formatTimeUnit (Time.toHour model.tz t))
+                                            |> (\t -> formatTimeUnit (Time.toHour model.tz t) ++ ":" ++ formatTimeUnit (Time.toMinute model.tz t))
 
                                     datetime =
                                         time ++ ", " ++ date
