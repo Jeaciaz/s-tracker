@@ -7,6 +7,7 @@ import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events exposing (..)
 import Http
+import Icons
 import Json.Decode as JD
 import Json.Encode as JE
 import RemoteData as RD
@@ -133,7 +134,9 @@ view model =
     main_ [ class "px-4 py-8 flex flex-col h-screen dark:bg-slate-700 dark:text-slate-100" ]
         [ div [ class "flex justify-between" ]
             [ h1 [ class "text-4xl" ] [ text "₪ Tracker" ]
-            , button [ class "p-1", onClick ReloadData ] [ img [ alt "", src "/reload.png" ] [] ]
+            , button [ class "p-1", onClick ReloadData, attribute "aria-label" "refresh" ]
+                [ Icons.refresh
+                ]
             ]
         , div [ class "mt-6" ]
             [ viewFunnels model

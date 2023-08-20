@@ -1,8 +1,7 @@
 {
-  "name": "STracker",
-  "short_name": "ST",
-  "description": "An expense tracker designed to make you more mindful of your purchases",
-  "icons": [
+    "name": "STracker",
+    "short_name": "STracker",
+    "icons": [
         {
             "src": "/android-chrome-192x192.png?v=2",
             "sizes": "192x192",
@@ -13,9 +12,8 @@
             "sizes": "512x512",
             "type": "image/png"
         }
-  ],
-  "start_url": "/",
-  "background_color": "#334155",
-  "theme_color": "#334155",
-  "display": "standalone"
+    ],
+    "theme_color": "#ffffff",
+    "background_color": "#ffffff",
+    "display": "standalone"
 }
