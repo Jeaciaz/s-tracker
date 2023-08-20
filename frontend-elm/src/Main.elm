@@ -139,7 +139,7 @@ view model =
             [ viewFunnels model
             , input
                 [ class "mt-4 py-2 px-1 rounded border border-slate-300 w-full text-2xl dark:bg-slate-600 dark:border-0"
-                , attribute "input-mode" "numeric"
+                , attribute "inputmode" "numeric"
                 , value model.delta
                 , onInput UpdateDelta
                 , placeholder "20.5"
