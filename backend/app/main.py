@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from .routers import funnels, spendings
+from .routers import funnels, spendings, users
 from .database import metadata_obj, engine
 
 allowed_origins = [
@@ -13,6 +13,7 @@ def make_app() -> FastAPI:
 
     app.include_router(funnels.router)
     app.include_router(spendings.router)
+    app.include_router(users.router)
 
     app.add_middleware(
         CORSMiddleware, 

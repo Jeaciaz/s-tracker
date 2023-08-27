@@ -3,6 +3,16 @@ import sqlalchemy as sa
 from ..database import metadata_obj
 
 
+users_table_name = "users"
+
+users_table = sa.Table(
+    users_table_name,
+    metadata_obj,
+    sa.Column('username', sa.String, primary_key=True),
+    sa.Column('otp_secret', sa.String, nullable=False),
+)
+
+
 funnels_table_name = "funnels"
 
 funnels_table = sa.Table(
@@ -13,6 +23,8 @@ funnels_table = sa.Table(
     sa.Column("limit", sa.Float),
     sa.Column("color", sa.String),
     sa.Column("emoji", sa.String(1)),
+
+    sa.Column('user_name', sa.String, sa.ForeignKey(users_table.c.username), nullable=False)
 )
 
 

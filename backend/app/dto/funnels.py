@@ -8,6 +8,7 @@ class FunnelPublic(BaseModel):
     color: Color
     emoji: str
     id: UUID4
+    user_name: str
     remaining: float
     daily: float
 
@@ -20,6 +21,7 @@ class FunnelCreate(BaseModel):
     limit: float
     color: Color
     emoji: str
+    user_name: str
 
     def dict(self, *args, **kwargs):
         return {**super().dict(*args, **kwargs), 'color': self.color.as_hex()}

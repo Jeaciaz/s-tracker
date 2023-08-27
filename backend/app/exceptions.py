@@ -3,3 +3,6 @@ class FunnelDoesNotExistException(ValueError):
 
 class SpendingDoesNotExistException(ValueError):
     ...
+
+class UserNotFoundException(ValueError):
+    ...
