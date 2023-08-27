@@ -22,7 +22,7 @@ class NewOtp(BaseModel):
 class UserJwtPayload(BaseModel):
     username: str
     exp: int
-    iss: int
+    iat: int
     type: Literal['access'] | Literal['refresh']
 
 class JwtPair(BaseModel):

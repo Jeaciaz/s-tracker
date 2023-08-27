@@ -6,3 +6,6 @@ class SpendingDoesNotExistException(ValueError):
 
 class UserNotFoundException(ValueError):
     ...
+
+class JwtTokenBlacklistedException(ValueError):
+    ...

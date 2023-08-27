@@ -27,8 +27,8 @@ class FunnelDAO(BaseDAO):
                                      'daily': remaining - (row['limit'] * get_current_period_remaining_days() / get_current_period_length()),
                                     })
 
-    def get_all(self) -> list[FunnelPublic]:
-        result = self._connection.execute(sa.select(funnels_table)).all()
+    def get_all(self, username: str) -> list[FunnelPublic]:
+        result = self._connection.execute(sa.select(funnels_table).where(funnels_table.c.user_name == username)).all()
         return([self.from_row(row._asdict()) for row in result])
 
     def create(self, funnel: FunnelCreate) -> UUID:

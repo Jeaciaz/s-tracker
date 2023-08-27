@@ -1,10 +1,12 @@
 import sqlalchemy as sa
 import pyotp
+import jwt
 
 from .base import BaseDAO
-from .tables import users_table
+from .tables import users_table, jwt_blacklist_table
 from ..dto.users import *
-from ..exceptions import UserNotFoundException
+from ..exceptions import UserNotFoundException, JwtTokenBlacklistedException
+from ..config import JWT_SECRET
 
 class UsersDAO(BaseDAO):
     def create(self, user: UserCreate):
@@ -22,3 +24,18 @@ class UsersDAO(BaseDAO):
             return pyotp.TOTP(secret).verify(otp)
         except:
             raise UserNotFoundException()
+    
+    def _check_token_blacklist(self, username: str, token_iat: int):
+        blacklist_entry = self._connection.execute(sa.select(jwt_blacklist_table).where(jwt_blacklist_table.c.username == username)).one_or_none()
+        return blacklist_entry is None or blacklist_entry[1] < token_iat 
+
+    def decode_token(self, token: str):
+        decoded = jwt.decode(token, JWT_SECRET, algorithms=["HS256"])
+        if not self._check_token_blacklist(decoded['username'], decoded['iat']):
+            raise JwtTokenBlacklistedException()
+        return decoded
+
+    def invalidate_tokens(self, username: str, iat_until: int):
+        """Invalidates all tokens forged before `iat_until` for user `username`"""
+        self._connection.execute(sa.delete(jwt_blacklist_table).where(jwt_blacklist_table.c.username == username))
+        self._connection.execute(sa.insert(jwt_blacklist_table).values({'username': username, 'iat_until': iat_until}))

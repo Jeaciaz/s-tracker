@@ -4,15 +4,14 @@ import pyotp
 import jwt
 
 from ..dependencies import DepUserDAO, DepUserAuth
+from ..exceptions import JwtTokenBlacklistedException
 from ..dto.users import *
 from ..config import JWT_SECRET
 
 router = APIRouter(prefix="/user", tags=["user"])
 
 
-def generate_jwt(
-    username: str, ttl: int, type: Literal["access"] | Literal["refresh"]
-):
+def generate_jwt(username: str, ttl: int, type: Literal["access"] | Literal["refresh"]):
     return jwt.encode(
         {
             "username": username,
@@ -23,11 +22,15 @@ def generate_jwt(
         JWT_SECRET,
     )
 
+
 def generate_jwt_pair(username: str):
     return JwtPair(
-        access=generate_jwt(username, 5 * 60, 'access'), # access ttl = 5 min
-        refresh=generate_jwt(username, 7 * 24 * 60 * 60, 'refresh') # refresh ttl = 7 days
+        access=generate_jwt(username, 30 * 60, "access"),  # access ttl = 30 min
+        refresh=generate_jwt(
+            username, 7 * 24 * 60 * 60, "refresh"
+        ),  # refresh ttl = 7 days
     )
+
 
 @router.post(
     "/generate-otp-secret",
@@ -63,6 +66,7 @@ def create_user(user: UserCreate, user_dao: DepUserDAO):
     user_dao.create(user)
     return generate_jwt_pair(user.username)
 
+
 @router.post(
     "/login",
     summary="Log into an account",
@@ -76,18 +80,31 @@ def login(user: UserLogin, user_dao: DepUserDAO):
         )
     return generate_jwt_pair(user.username)
 
+
 @router.post(
-        "/refresh",
-        summary="Refresh a pair of tokens",
-        status_code=status.HTTP_200_OK,
-        response_model=JwtPair
+    "/refresh",
+    summary="Refresh a pair of tokens",
+    status_code=status.HTTP_200_OK,
+    response_model=JwtPair,
 )
-def refresh_pair(body: JwtRefreshBody):
+def refresh_pair(body: JwtRefreshBody, user_dao: DepUserDAO):
     try:
-        decoded = jwt.decode(body.refresh, JWT_SECRET, algorithms=["HS256"])
-        return generate_jwt_pair(decoded['username'])
+        decoded = user_dao.decode_token(body.refresh)
+        user_dao.invalidate_tokens(decoded["username"], decoded["iat"])
+        return generate_jwt_pair(decoded["username"])
     except jwt.ExpiredSignatureError:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Refresh token is expired")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="Refresh token is expired"
+        )
+    except JwtTokenBlacklistedException:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="Refresh token is blacklisted"
+        )
+    except:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid token"
+        )
+
 
 @router.get(
     "/decode",

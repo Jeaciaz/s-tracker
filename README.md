@@ -25,6 +25,6 @@ After doing `cd backend`:
 This project uses:
 - Python
 - FastAPI
-- SqlAlchemy/ORM
+- SqlAlchemy Core
 - SQLite
 - Pytest
