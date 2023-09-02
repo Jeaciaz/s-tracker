@@ -38,7 +38,8 @@ def generate_jwt_pair(username: str):
     status_code=status.HTTP_200_OK,
     response_model=NewOtp,
 )
-def generate_otp_secret(username: str, user_dao: DepUserDAO):
+def generate_otp_secret(body: GenerateSecretBody, user_dao: DepUserDAO):
+    username = body.username
     if not user_dao.check_username(username):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, detail="Username already taken"

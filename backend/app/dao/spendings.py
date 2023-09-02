@@ -31,16 +31,10 @@ class SpendingDAO(BaseDAO):
         )
 
         if username is not None:
-            query = query.select_from(
-                sa.join(
-                    spendings_table,
-                    sa.join(
-                        funnels_table,
-                        users_table,
-                        funnels_table.c.user_name == users_table.c.username,
-                    ),
-                )
-            ).where(users_table.c.username == username)
+            query = query.where(
+                (spendings_table.c.funnel_id == funnels_table.c.id)
+                & (funnels_table.c.user_name == username)
+            )
 
         if funnel_id is not None:
             query = query.where(spendings_table.c.funnel_id == str(funnel_id))

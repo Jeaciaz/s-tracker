@@ -31,3 +31,6 @@ class JwtPair(BaseModel):
 
 class JwtRefreshBody(BaseModel):
     refresh: str
+
+class GenerateSecretBody(BaseModel):
+    username: str

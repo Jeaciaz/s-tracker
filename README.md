@@ -1,20 +1,27 @@
 # XTracker
-This is a personal project for me and my family to track expenses and plan our budget with some personal and shared spending categories (I call them sinks here).
+This is a personal project for me and my family to track expenses and plan our budget with some personal and shared spending categories (I call them funnels here).
 
-## Set up & launch backend
-Enter backend directory:
+## Deploy the app
+Deployment is simple. First, you need to set up environment variables:
 
-```cd backend```
+```cp backend/.env.example backend/.env && vi backend/.env```
 
-Install requirements (probably in a virtual environment):
+They are described further on.
+Then, it is as simple as running:
+```docker compose build && docker compose up -d```
 
-```pip install -r requirements.txt```
+Running the development version is trickier, and will be described later.
 
-Run the server:
+## ENV Variables
+`DB_URL` - the string that indicates where the DB will be. See https://docs.sqlalchemy.org/en/20/core/engines.html#sqlalchemy.create_engine
+`JWT_SECRET` - a secret key for generating JWTs for auth
 
-```uvicorn app.main:app --reload```
+## Dev build
+To run frontend:
+```cd frontend && npm run dev```
 
-**TODO**: do this using Docker.
+To run backend:
+```cd backend && alembic upgrade head && uvicorn app.main:app --reload```
 
 ## Run tests
 After doing `cd backend`:
