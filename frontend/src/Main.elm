@@ -1,19 +1,26 @@
-module Main exposing (main)
+port module Main exposing (main)
 
-import Browser
-import Date
-import Dict
+import Browser exposing (UrlRequest)
+import Browser.Navigation as Nav
+import Dashboard
+import Effect exposing (Effect)
 import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events exposing (..)
-import Http
-import Icons
-import Json.Decode as JD
-import Json.Encode as JE
+import Login
+import Data as D
 import RemoteData as RD
-import Task
-import Time
-import Utils
+import Url
+
+
+
+-- PORTS
+
+
+port copyText : String -> Cmd msg
+
+
+port alert : String -> Cmd msg
 
 
 
@@ -22,11 +29,13 @@ import Utils
 
 main : Program Flags Model Msg
 main =
-    Browser.element
+    Browser.application
         { init = init
         , update = update
         , view = view
         , subscriptions = subscriptions
+        , onUrlRequest = LinkClicked
+        , onUrlChange = UrlChanged
         }
 
 
@@ -34,86 +43,210 @@ main =
 -- MODEL
 
 
+type PageModel
+    = DashboardPage Dashboard.Model
+    | LoginPage Login.Model
+
+
 type alias Model =
-    { delta : String
-    , funnels : RD.WebData Funnels
-    , spendings : RD.WebData Spendings
-    , tz : Time.Zone
+    { page : PageModel
+    , auth : D.Auth
+    , navKey : Nav.Key
+    , effectQueue : List (Effect Msg)
+    , refetchQueue : List (D.User -> Effect Msg)
     , baseUrl : String
+    , url : Url.Url
     }
 
 
-type alias Funnel =
-    { name : String
-    , color : String
-    , emoji : String
-    , remaining : Float
-    , limit : Float
-    , daily : Float
-    , id : String
-    }
+mapEffectQueue : (msg -> Msg) -> List (Effect msg) -> List (Effect Msg)
+mapEffectQueue f =
+    List.map (Effect.mapEffect f)
 
 
-type alias Funnels =
-    List Funnel
 
-
-type alias Spending =
-    { amount : Float
-    , timestamp : Int
-    , funnelId : String
-    }
-
-
-type alias Spendings =
-    List Spending
+-- INIT
 
 
 type alias Flags =
-    { baseUrl : String }
+    { baseUrl : String
+    , tokens : Maybe D.TokenPair
+    }
 
 
-init : Flags -> ( Model, Cmd Msg )
-init { baseUrl } =
-    ( { delta = ""
-      , funnels = RD.Loading
-      , spendings = RD.Loading
-      , tz = Time.utc
+mapInit : (modelA -> modelB) -> (msgA -> msgB) -> ( modelA, List (Effect msgA) ) -> ( modelB, List (Effect msgB) )
+mapInit mapModel mapMsg ( modelA, effects ) =
+    ( mapModel modelA, List.map (Effect.mapEffect mapMsg) effects )
+
+
+init : Flags -> Url.Url -> Nav.Key -> ( Model, Cmd Msg )
+init { baseUrl, tokens } url key =
+    let
+        auth =
+            case Maybe.andThen D.tokenPairToUser tokens of
+                Just user ->
+                    D.LoggedIn user
+
+                Nothing ->
+                    D.LoggedOut
+
+        ( model, taskList ) =
+            case auth of
+                D.LoggedOut ->
+                    Login.init baseUrl |> mapInit LoginPage GotLoginMsg
+
+                D.Refreshing ->
+                    Login.init baseUrl |> mapInit LoginPage GotLoginMsg
+
+                D.LoggedIn user ->
+                    Dashboard.init baseUrl user |> mapInit DashboardPage GotDashboardMsg
+    in
+    ( { page = model
+      , auth = auth
+      , navKey = key
+      , effectQueue = taskList
+      , refetchQueue = []
       , baseUrl = baseUrl
+      , url = url
       }
-    , Cmd.batch [ getData baseUrl, Task.perform AdjustTimeZone Time.here ]
+    , Cmd.none
     )
+        |> runEffects
+
+
+
+-- UPDATE
 
 
 type Msg
-    = UpdateDelta String
-    | FunnelsResponse (RD.WebData Funnels)
-    | SpendingsResponse (RD.WebData Spendings)
-    | AdjustTimeZone Time.Zone
-    | CreateSpending String
-    | ReloadData
+    = GotDashboardMsg Dashboard.Msg
+    | GotLoginMsg Login.Msg
+    | LinkClicked Browser.UrlRequest
+    | UrlChanged Url.Url
+    | UserUpdated (Maybe D.User)
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
-    case msg of
-        UpdateDelta new ->
-            ( { model | delta = new }, Cmd.none )
+    let
+        intermediate =
+            case ( msg, model.page ) of
+                ( LinkClicked urlRequest, _ ) ->
+                    case urlRequest of
+                        Browser.Internal url ->
+                            ( model, Nav.pushUrl model.navKey (Url.toString url) )
 
-        FunnelsResponse response ->
-            ( { model | funnels = response }, Cmd.none )
+                        Browser.External href ->
+                            ( model, Nav.load href )
 
-        SpendingsResponse response ->
-            ( { model | spendings = response }, Cmd.none )
+                ( UrlChanged url, _ ) ->
+                    ( { model | url = url }, Cmd.none )
 
-        AdjustTimeZone zone ->
-            ( { model | tz = zone }, Cmd.none )
+                ( GotDashboardMsg pMsg, DashboardPage pModel ) ->
+                    let
+                        ( dNewModel, dEffectList ) =
+                            Dashboard.update pMsg pModel
+                    in
+                    ( { model
+                        | page = DashboardPage dNewModel
+                        , effectQueue = model.effectQueue ++ mapEffectQueue GotDashboardMsg dEffectList
+                      }
+                    , Cmd.none
+                    )
 
-        CreateSpending funnelId ->
-            ( { model | delta = "" }, Task.perform (\_ -> ReloadData) (Time.now |> Task.andThen (postSpending model.baseUrl model.delta funnelId)) )
+                ( GotLoginMsg pMsg, LoginPage pModel ) ->
+                    let
+                        ( newModel, pEffectList ) =
+                            Login.update pMsg pModel
+                    in
+                    ( { model
+                        | page = LoginPage newModel
+                        , effectQueue = model.effectQueue ++ mapEffectQueue GotLoginMsg pEffectList
+                      }
+                    , Cmd.none
+                    )
 
-        ReloadData ->
-            ( { model | funnels = RD.Loading, spendings = RD.Loading }, getData model.baseUrl )
+                ( UserUpdated maybeUser, _ ) ->
+                    case maybeUser of
+                        Just user ->
+                            let
+                                ( newModel, effectCmd ) =
+                                    runGlobalEffect model (Effect.SaveTokens user)
+                            in
+                            ( { newModel 
+                                | auth = D.LoggedIn user 
+                                , effectQueue = List.map (\f -> f user) model.refetchQueue
+                                , refetchQueue = []
+                            }
+                            , effectCmd
+                            )
+
+                        Nothing ->
+                            ( { model | auth = D.LoggedOut, page = LoginPage <| Tuple.first <| Login.init model.baseUrl }, Cmd.none )
+
+                ( _, _ ) ->
+                    ( model, Cmd.none )
+    in
+    runEffects intermediate
+
+
+runEffects : ( Model, Cmd Msg ) -> ( Model, Cmd Msg )
+runEffects ( model, cmd ) =
+    model.effectQueue
+        |> List.foldr
+            (\effect ( m, c ) ->
+                let
+                    ( newM, newC ) =
+                        case effect of
+                            Effect.Local l ->
+                                ( m, Effect.runLocalEffect l )
+
+                            Effect.Global g ->
+                                runGlobalEffect m g
+                in
+                ( newM, Cmd.batch [ newC, c ] )
+            )
+            ( { model | effectQueue = [] }, cmd )
+
+
+runGlobalEffect : Model -> Effect.GlobalEffect Msg -> ( Model, Cmd Msg )
+runGlobalEffect model effect =
+    case effect of
+        Effect.CopyText text ->
+            ( model, copyText text )
+
+        Effect.Alert text ->
+            ( model, alert text )
+
+        Effect.SaveTokens user ->
+            ( model, D.saveTokens user )
+
+        Effect.RevalidateToken baseUrl user genMsg ->
+            case model.auth of
+                D.LoggedIn _ ->
+                    ( { model
+                        | auth = D.Refreshing
+                        , refetchQueue = genMsg :: model.refetchQueue
+                      }
+                    , Effect.revalidateRequest baseUrl user (RD.toMaybe >> UserUpdated)
+                    )
+
+                _ ->
+                    ( { model | refetchQueue = genMsg :: model.refetchQueue }, Cmd.none )
+
+        Effect.GotoHomePage user ->
+            let
+                ( pageModel, pageEffects ) =
+                    Dashboard.init model.baseUrl user
+            in
+            ( { model
+                | auth = D.LoggedIn user
+                , page = DashboardPage pageModel
+                , effectQueue = model.effectQueue ++ List.map (Effect.mapEffect GotDashboardMsg) pageEffects
+              }
+            , Cmd.none
+            )
+                |> runEffects
 
 
 
@@ -121,217 +254,32 @@ update msg model =
 
 
 subscriptions : Model -> Sub Msg
-subscriptions _ =
-    Sub.none
+subscriptions model =
+    let
+        pageSub =
+            case model.page of
+                DashboardPage dModel ->
+                    Sub.map GotDashboardMsg <| Dashboard.subscriptions dModel
+
+                LoginPage lModel ->
+                    Sub.map GotLoginMsg <| Login.subscriptions lModel
+    in
+    Sub.batch [ pageSub, D.tokensUpdated UserUpdated ]
 
 
 
 -- VIEW
 
 
-view : Model -> Html Msg
+view : Model -> Browser.Document Msg
 view model =
-    main_ [ class "px-4 py-8 flex flex-col h-screen dark:bg-slate-700 dark:text-slate-100" ]
-        [ div [ class "flex justify-between" ]
-            [ h1 [ class "text-4xl" ] [ text "₪ Tracker" ]
-            , button [ class "p-1", onClick ReloadData, attribute "aria-label" "refresh" ]
-                [ Icons.refresh
-                ]
-            ]
-        , div [ class "mt-6" ]
-            [ viewFunnels model
-            , input
-                [ class "mt-4 py-2 px-1 rounded border border-slate-300 w-full text-2xl dark:bg-slate-600 dark:border-0"
-                , attribute "inputmode" "numeric"
-                , value model.delta
-                , onInput UpdateDelta
-                , placeholder "20.5"
-                ]
-                []
-            , mapWebData model.funnels <|
-                \funnels ->
-                    div [ class "grid grid-cols-2 mt-4" ] <|
-                        List.map
-                            (\funnel ->
-                                button
-                                    [ class "py-2 active:brightness-75"
-                                    , style "background-color" funnel.color
-                                    , onClick (CreateSpending funnel.id)
-                                    ]
-                                    [ text funnel.emoji ]
-                            )
-                            funnels
-            ]
-        , viewSpendings model
+    { title = "₪ Tracker"
+    , body =
+        [ case model.page of
+            DashboardPage dModel ->
+                Dashboard.view dModel |> Html.map GotDashboardMsg
+
+            LoginPage lModel ->
+                Login.view lModel |> Html.map GotLoginMsg
         ]
-
-
-mapWebData : RD.WebData a -> (a -> Html Msg) -> Html Msg
-mapWebData model render =
-    case model of
-        RD.NotAsked ->
-            div [] []
-
-        RD.Loading ->
-            div [] []
-
-        RD.Failure _ ->
-            div [] [ text "error" ]
-
-        RD.Success data ->
-            render data
-
-
-viewFunnels : Model -> Html Msg
-viewFunnels model =
-    mapWebData model.funnels <|
-        \funnels ->
-            div [ class "grid grid-cols-12 gap-2 items-end" ]
-                (funnels
-                    |> List.concatMap
-                        (\funnel ->
-                            let
-                                deltaNum =
-                                    Utils.prefixToFloat model.delta |> Maybe.withDefault 0
-
-                                dailyText =
-                                    if deltaNum == 0 then
-                                        div [ class "pb-1" ] [ text (Utils.formatFloat funnel.daily) ]
-
-                                    else
-                                        div [ class "pb-1 flex gap-2 justify-center" ]
-                                            [ span [ class "text-red-600 line-through" ] [ text (Utils.formatFloat funnel.daily) ]
-                                            , span [] [ text (Utils.formatFloat (funnel.daily - deltaNum)) ]
-                                            ]
-
-                                bars =
-                                    [ { value = funnel.limit, opacity = 0.33 }
-                                    , { value = funnel.remaining, opacity = 0.67 }
-                                    ]
-                                        |> List.map
-                                            (\bar ->
-                                                div
-                                                    [ class "absolute bottom-0 h-1 rounded"
-                                                    , style "background-color" funnel.color
-                                                    , style "opacity" (String.fromFloat bar.opacity)
-                                                    , style "width" <| String.fromFloat (100 * bar.value / funnel.limit) ++ "%"
-                                                    ]
-                                                    []
-                                            )
-                            in
-                            [ div [ class "col-span-2 text-sm" ] [ text funnel.name ]
-                            , div [ class "col-span-8 text-center text-lg relative" ] (dailyText :: bars)
-                            , div [ class "col-span-2 text-sm text-end" ] [ text (String.fromInt (round funnel.remaining)) ]
-                            ]
-                        )
-                )
-
-
-viewSpendings : Model -> Html Msg
-viewSpendings model =
-    mapWebData (RD.map2 (\a b -> ( a, b )) model.funnels model.spendings)
-        (\( funnels, spendings ) ->
-            div [ class "relative grow" ]
-                [ div [ class "absolute inset-0 overflow-y-auto flex flex-col" ]
-                    (List.reverse <|
-                        List.map
-                            (\spending ->
-                                let
-                                    emoji =
-                                        List.foldl (\el acc -> Dict.insert el.id el.emoji acc) Dict.empty funnels
-                                            |> Dict.get spending.funnelId
-                                            |> Maybe.withDefault ":("
-
-                                    date =
-                                        spending.timestamp
-                                            |> Time.millisToPosix
-                                            |> Date.fromPosix model.tz
-                                            |> Date.format "dd.MM.y"
-
-                                    formatTimeUnit unit =
-                                        unit |> String.fromInt |> String.padLeft 2 '0'
-
-                                    time =
-                                        spending.timestamp
-                                            |> Time.millisToPosix
-                                            |> (\t -> formatTimeUnit (Time.toHour model.tz t) ++ ":" ++ formatTimeUnit (Time.toMinute model.tz t))
-
-                                    datetime =
-                                        time ++ ", " ++ date
-                                in
-                                div [ class "flex gap-2 py-4 border-b border-slate-300 dark:border-slate-500" ]
-                                    [ div [] [ text emoji ]
-                                    , div [] [ text (Utils.formatFloat spending.amount) ]
-                                    , div [ class "ms-auto" ] [ text datetime ]
-                                    ]
-                            )
-                            spendings
-                    )
-                ]
-        )
-
-
-getFunnels : String -> Cmd Msg
-getFunnels baseUrl =
-    Http.get
-        { url = baseUrl ++ "/funnel/"
-        , expect = Http.expectJson (RD.fromResult >> FunnelsResponse) decodeFunnels
-        }
-
-
-getSpendings : String -> Cmd Msg
-getSpendings baseUrl =
-    Http.get
-        { url = baseUrl ++ "/spending/"
-        , expect = Http.expectJson (RD.fromResult >> SpendingsResponse) decodeSpendings
-        }
-
-
-getData : String -> Cmd Msg
-getData baseUrl =
-    Cmd.batch [ getFunnels baseUrl, getSpendings baseUrl ]
-
-
-postSpending : String -> String -> String -> Time.Posix -> Task.Task error ()
-postSpending baseUrl amount funnelId time =
-    Http.task
-        { method = "POST"
-        , headers = []
-        , url = baseUrl ++ "/spending/"
-        , body = Http.jsonBody (encodeSpending time amount funnelId)
-        , resolver = Http.bytesResolver (\_ -> Result.Ok ())
-        , timeout = Nothing
-        }
-
-
-decodeFunnels : JD.Decoder Funnels
-decodeFunnels =
-    JD.list
-        (JD.map7 Funnel
-            (JD.field "name" JD.string)
-            (JD.field "color" JD.string)
-            (JD.field "emoji" JD.string)
-            (JD.field "remaining" JD.float)
-            (JD.field "limit" JD.float)
-            (JD.field "daily" JD.float)
-            (JD.field "id" JD.string)
-        )
-
-
-decodeSpendings : JD.Decoder Spendings
-decodeSpendings =
-    JD.list
-        (JD.map3 Spending
-            (JD.field "amount" JD.float)
-            (JD.field "timestamp" JD.int)
-            (JD.field "funnel_id" JD.string)
-        )
-
-
-encodeSpending : Time.Posix -> String -> String -> JE.Value
-encodeSpending time amount funnelId =
-    JE.object
-        [ ( "amount", JE.string amount )
-        , ( "timestamp", JE.int (Time.posixToMillis time) )
-        , ( "funnel_id", JE.string funnelId )
-        ]
+    }

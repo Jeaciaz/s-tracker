@@ -2,7 +2,11 @@
 module.exports = {
   content: ["./src/**/*.elm"],
   theme: {
-    extend: {},
+    extend: {
+			colors: {
+				accent: '#F1C40F',
+			},
+		},
   },
   plugins: [],
 }
