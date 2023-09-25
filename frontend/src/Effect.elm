@@ -153,7 +153,7 @@ runLocalEffect effect =
             requestTask
                 { method = Get
                 , headers = [ Data.getAuthHeader user ]
-                , url = baseUrl ++ "/funnel/"
+                , url = baseUrl ++ "/funnel"
                 , decoder = Data.decodeFunnels
                 }
                 |> Task.perform genMsg
@@ -162,7 +162,7 @@ runLocalEffect effect =
             requestTask
                 { method = Get
                 , headers = [ Data.getAuthHeader user ]
-                , url = baseUrl ++ "/spending/"
+                , url = baseUrl ++ "/spending"
                 , decoder = Data.decodeSpendings
                 }
                 |> Task.perform genMsg
@@ -171,7 +171,7 @@ runLocalEffect effect =
             requestTask
                 { method = Post (body |> Data.encodeOtpSecretRequest |> Http.jsonBody)
                 , headers = []
-                , url = baseUrl ++ "/user/generate-otp-secret/"
+                , url = baseUrl ++ "/user/generate-otp-secret"
                 , decoder = Data.decodeOtpSecret
                 }
                 |> Task.perform genMsg
@@ -180,7 +180,7 @@ runLocalEffect effect =
             requestTask
                 { method = Post (body |> Data.encodeRegisterRequest |> Http.jsonBody)
                 , headers = []
-                , url = baseUrl ++ "/user/"
+                , url = baseUrl ++ "/user"
                 , decoder = Data.decodeUserFromTokenPairResponse
                 }
                 |> Task.map extractMaybeUser
@@ -190,7 +190,7 @@ runLocalEffect effect =
             requestTask
                 { method = Post (body |> Data.encodeLoginRequest |> Http.jsonBody)
                 , headers = []
-                , url = baseUrl ++ "/user/login/"
+                , url = baseUrl ++ "/user/login"
                 , decoder = Data.decodeUserFromTokenPairResponse
                 }
                 |> Task.map extractMaybeUser
@@ -203,7 +203,7 @@ runLocalEffect effect =
                         requestTask
                             { method = Post (bodyWithoutTs |> Data.addTsToSpending ts |> Data.encodeSpending |> Http.jsonBody)
                             , headers = [ Data.getAuthHeader user ]
-                            , url = baseUrl ++ "/spending/"
+                            , url = baseUrl ++ "/spending"
                             , decoder = Data.decodeNothing
                             }
             in
@@ -215,7 +215,7 @@ revalidateRequest baseUrl user genMsg =
     requestTask
         { method = Post (user |> Data.encodeRefreshRequest |> Http.jsonBody)
         , headers = []
-        , url = baseUrl ++ "/user/refresh/"
+        , url = baseUrl ++ "/user/refresh"
         , decoder = Data.decodeUserFromTokenPairResponse
         }
         |> Task.map extractMaybeUser
