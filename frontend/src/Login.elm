@@ -293,7 +293,7 @@ viewRegisterFields { username, otpSecret } =
                             ]
                         , div [ class "fixed bottom-0 inset-x-0 flex flex-col p-6" ]
                             [ Ui.Button.view
-                                { onClick = Nothing
+                                { onClick = Just (RegisterNewUser { username = username, otpSecret = secret, otpExample = otp })
                                 , color = Ui.Button.Accent
                                 , state =
                                     if otp /= "" then
