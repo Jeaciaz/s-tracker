@@ -1,11 +1,21 @@
-module Effect exposing (Effect(..), GlobalEffect(..), LocalEffect(..), mapEffect, mapLocalEffect, revalidateRequest, runLocalEffect)
+module Effect exposing (Effect(..), GlobalEffect(..), LocalEffect(..), ResponseData, ResponseError(..), mapEffect, mapLocalEffect, revalidateRequest, runLocalEffect)
 
+import Data exposing (User)
 import Http
 import Json.Decode as JD
-import Data exposing (User)
 import RemoteData as RD
 import Task
 import Time
+import Utils
+
+
+type ResponseError
+    = InvalidToken
+    | Other String
+
+
+type alias ResponseData res =
+    RD.RemoteData ResponseError res
 
 
 type HttpMethod
@@ -21,12 +31,12 @@ type Effect msgOnSuccess
 
 
 type LocalEffect msgOnSuccess
-    = FetchFunnels String User (RD.WebData Data.Funnels -> msgOnSuccess)
-    | FetchSpendings String User (RD.WebData Data.Spendings -> msgOnSuccess)
-    | GenerateOtpSecret String Data.OtpSecretRequest (RD.WebData Data.OtpSecretResponse -> msgOnSuccess)
-    | RegisterNewUser String Data.RegisterRequest (RD.WebData User -> msgOnSuccess)
-    | Login String Data.LoginRequest (RD.WebData User -> msgOnSuccess)
-    | CreateSpending String User Data.SpendingCreateWithoutTs (RD.WebData () -> msgOnSuccess)
+    = FetchFunnels String User (ResponseData Data.Funnels -> msgOnSuccess)
+    | FetchSpendings String User (ResponseData Data.Spendings -> msgOnSuccess)
+    | GenerateOtpSecret String Data.OtpSecretRequest (ResponseData Data.OtpSecretResponse -> msgOnSuccess)
+    | RegisterNewUser String Data.RegisterRequest (ResponseData User -> msgOnSuccess)
+    | Login String Data.LoginRequest (ResponseData User -> msgOnSuccess)
+    | CreateSpending String User Data.SpendingCreateWithoutTs (ResponseData () -> msgOnSuccess)
 
 
 type GlobalEffect msgOnSuccess
@@ -42,12 +52,10 @@ type alias RequestConfig response =
     , url : String
     , headers : List Http.Header
     , decoder : JD.Decoder response
-
-    -- , expect : Http.Expect msg
     }
 
 
-requestTask : RequestConfig res -> Task.Task x (RD.WebData res)
+requestTask : RequestConfig res -> Task.Task x (ResponseData res)
 requestTask { method, url, headers, decoder } =
     let
         ( methodStr, body ) =
@@ -77,19 +85,28 @@ requestTask { method, url, headers, decoder } =
                         Http.GoodStatus_ _ resText ->
                             resText
                                 |> JD.decodeString decoder
-                                |> Result.mapError (JD.errorToString >> Http.BadBody)
+                                |> Result.mapError (JD.errorToString >> Other)
 
                         Http.BadUrl_ url_ ->
-                            Result.Err (Http.BadUrl url_)
+                            Result.Err (Http.BadUrl url_ |> Utils.errorToString |> Other)
 
                         Http.Timeout_ ->
-                            Result.Err Http.Timeout
+                            Result.Err (Http.Timeout |> Utils.errorToString |> Other)
 
                         Http.NetworkError_ ->
-                            Result.Err Http.NetworkError
+                            Result.Err (Http.NetworkError |> Utils.errorToString |> Other)
 
-                        Http.BadStatus_ { statusCode } _ ->
-                            Result.Err (Http.BadStatus statusCode)
+                        Http.BadStatus_ { statusCode } detail ->
+                            Result.Err
+                                (if statusCode == 403 then
+                                    InvalidToken
+
+                                 else
+                                    detail
+                                        |> JD.decodeString Data.decodeServerError
+                                        |> Result.withDefault "Something went wrong"
+                                        |> Other
+                                )
                 )
         }
         |> RD.fromTask
@@ -210,7 +227,7 @@ runLocalEffect effect =
             Task.perform genMsg (Time.now |> Task.map Time.posixToMillis |> Task.andThen req)
 
 
-revalidateRequest : String -> User -> (RD.WebData User -> msg) -> Cmd msg
+revalidateRequest : String -> User -> (ResponseData User -> msg) -> Cmd msg
 revalidateRequest baseUrl user genMsg =
     requestTask
         { method = Post (user |> Data.encodeRefreshRequest |> Http.jsonBody)
@@ -222,6 +239,6 @@ revalidateRequest baseUrl user genMsg =
         |> Task.perform genMsg
 
 
-extractMaybeUser : RD.WebData (Maybe Data.User) -> RD.WebData Data.User
+extractMaybeUser : ResponseData (Maybe Data.User) -> ResponseData Data.User
 extractMaybeUser =
-    RD.andThen (RD.fromMaybe (Http.BadBody "Invalid token send in response :("))
+    RD.andThen (RD.fromMaybe (Other "Invalid token sent in response :("))

@@ -20,8 +20,8 @@ import Utils
 
 type alias Model =
     { delta : String
-    , funnels : RD.WebData Funnels
-    , spendings : RD.WebData Spendings
+    , funnels : Effect.ResponseData Funnels
+    , spendings : Effect.ResponseData Spendings
     , tz : Time.Zone
     , baseUrl : String
     , user : D.User
@@ -63,7 +63,6 @@ init baseUrl user =
       , baseUrl = baseUrl
       , user = user
       }
-      -- , Cmd.batch [ Task.perform AdjustTimeZone Time.here ]
     , [ Effect.Local <| Effect.FetchFunnels baseUrl user FunnelsResponse
       , Effect.Local <| Effect.FetchSpendings baseUrl user SpendingsResponse
       ]
@@ -72,8 +71,8 @@ init baseUrl user =
 
 type Msg
     = UpdateDelta String
-    | FunnelsResponse (RD.WebData Funnels)
-    | SpendingsResponse (RD.WebData Spendings)
+    | FunnelsResponse (Effect.ResponseData Funnels)
+    | SpendingsResponse (Effect.ResponseData Spendings)
     | AdjustTimeZone Time.Zone
     | CreateSpending String
     | ReloadData
@@ -94,16 +93,22 @@ update msg model =
 
         FunnelsResponse response ->
             case response of
-                RD.Failure (Http.BadStatus 403) ->
+                RD.Failure Effect.InvalidToken ->
                     ( model, [ Effect.Global <| Effect.RevalidateToken model.baseUrl model.user fetchFunnelsEffect ] )
+
+                RD.Failure (Effect.Other detail) ->
+                    ( model, [ Effect.Global <| Effect.Alert detail ] )
 
                 _ ->
                     ( { model | funnels = response }, [] )
 
         SpendingsResponse response ->
             case response of
-                RD.Failure (Http.BadStatus 403) ->
+                RD.Failure Effect.InvalidToken ->
                     ( model, [ Effect.Global <| Effect.RevalidateToken model.baseUrl model.user fetchSpendingsEffect ] )
+
+                RD.Failure (Effect.Other detail) ->
+                    ( model, [ Effect.Global <| Effect.Alert detail ] )
 
                 _ ->
                     ( { model | spendings = response }, [] )
@@ -189,7 +194,7 @@ view model =
         ]
 
 
-mapWebData : RD.WebData a -> (a -> Html Msg) -> Html Msg
+mapWebData : Effect.ResponseData a -> (a -> Html Msg) -> Html Msg
 mapWebData model render =
     case model of
         RD.NotAsked ->

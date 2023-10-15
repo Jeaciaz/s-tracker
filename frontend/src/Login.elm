@@ -1,14 +1,15 @@
 module Login exposing (Model, Msg, init, subscriptions, update, view)
 
-import Effect exposing (Effect)
+import Data as D
+import Effect exposing (Effect, ResponseError(..))
 import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events exposing (..)
 import Layout
-import Data as D
 import RemoteData as RD
 import Ui.Button
 import Ui.Input
+import Utils
 
 
 
@@ -64,17 +65,17 @@ type RegisterMsg
     = UpdateRegisterUsername String
     | UpdateRegisterOtp String
     | GenerateOtpSecret
-    | GeneratedOtpSecret (RD.WebData D.OtpSecretResponse)
+    | GeneratedOtpSecret (Effect.ResponseData D.OtpSecretResponse)
     | CopySecret String
     | RegisterNewUser D.RegisterRequest
-    | NewUserRegistered (RD.WebData D.User)
+    | NewUserRegistered (Effect.ResponseData D.User)
 
 
 type LoginMsg
     = UpdateLoginUsername String
     | UpdateLoginOtp String
     | SubmitLogin
-    | SuccessfulLogin (RD.WebData D.User)
+    | SuccessfulLogin (Effect.ResponseData D.User)
 
 
 type Msg
@@ -100,21 +101,30 @@ updateRegisterModel msg model baseUrl =
 
         GeneratedOtpSecret response ->
             let
-                newModel =
+                ( newModel, effects ) =
                     case response of
                         RD.Success { secret, uri } ->
-                            { model | otpSecret = Generated { secret = secret, uri = uri, otp = "" } }
+                            ( { model | otpSecret = Generated { secret = secret, uri = uri, otp = "" } }, [] )
 
-                        RD.Failure _ ->
-                            { model | otpSecret = NotGenerated }
+                        RD.Failure err ->
+                            let
+                                detail =
+                                    case err of
+                                        InvalidToken ->
+                                            "You shall not pass"
+
+                                        Other d ->
+                                            d
+                            in
+                            ( { model | otpSecret = NotGenerated }, [ Effect.Global <| Effect.Alert detail ] )
 
                         RD.Loading ->
-                            model
+                            ( model, [] )
 
                         RD.NotAsked ->
-                            model
+                            ( model, [] )
             in
-            ( Register newModel, [] )
+            ( Register newModel, effects )
 
         UpdateRegisterOtp newOtp ->
             let
@@ -137,19 +147,21 @@ updateRegisterModel msg model baseUrl =
 
         RegisterNewUser request ->
             ( Register model
-            , [ Effect.Local <|Effect.RegisterNewUser
-                    baseUrl
-                    request
-                    (NewUserRegistered >> GotRegisterMsg)
+            , [ Effect.Local <|
+                    Effect.RegisterNewUser
+                        baseUrl
+                        request
+                        (NewUserRegistered >> GotRegisterMsg)
               ]
             )
 
         NewUserRegistered userRd ->
             case RD.toMaybe userRd of
-              Just user -> 
-                ( Register model, [Effect.Global <| Effect.GotoHomePage user] )
-              Nothing ->
-                ( Register model, [Effect.Global <| Effect.Alert "Registration unsuccessful"])
+                Just user ->
+                    ( Register model, [ Effect.Global <| Effect.GotoHomePage user ] )
+
+                Nothing ->
+                    ( Register model, [ Effect.Global <| Effect.Alert "Registration unsuccessful" ] )
 
 
 updateLoginModel : LoginMsg -> LoginModel -> String -> ( ModeModel, List (Effect Msg) )
@@ -163,10 +175,11 @@ updateLoginModel msg model baseUrl =
 
         SubmitLogin ->
             ( Login { model | isSubmitting = True }
-            , [ Effect.Local <| Effect.Login
-                    baseUrl
-                    { username = model.username, otp = model.otp }
-                    (SuccessfulLogin >> GotLoginMsg)
+            , [ Effect.Local <|
+                    Effect.Login
+                        baseUrl
+                        { username = model.username, otp = model.otp }
+                        (SuccessfulLogin >> GotLoginMsg)
               ]
             )
 
@@ -175,10 +188,10 @@ updateLoginModel msg model baseUrl =
                 effects =
                     case RD.toMaybe userData of
                         Nothing ->
-                            [Effect.Global <| Effect.Alert "Login unsuccessful"]
+                            [ Effect.Global <| Effect.Alert "Login unsuccessful" ]
 
                         Just user ->
-                            [Effect.Global <| Effect.SaveTokens user, Effect.Global <| Effect.GotoHomePage user]
+                            [ Effect.Global <| Effect.SaveTokens user, Effect.Global <| Effect.GotoHomePage user ]
             in
             ( Login { model | isSubmitting = False }, effects )
 

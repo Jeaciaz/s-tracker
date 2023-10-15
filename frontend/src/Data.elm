@@ -16,6 +16,7 @@ port module Data exposing
     , decodeFunnels
     , decodeNothing
     , decodeOtpSecret
+    , decodeServerError
     , decodeSpendings
     , decodeUserFromTokenPairResponse
     , encodeLoginRequest
@@ -257,3 +258,12 @@ encodeLoginRequest { username, otp } =
 encodeRefreshRequest : User -> JE.Value
 encodeRefreshRequest (User _ { refresh }) =
     JE.object [ ( "refresh", JE.string refresh ) ]
+
+
+decodeServerError : JD.Decoder String
+decodeServerError =
+    JD.oneOf
+        [ JD.field "detail" JD.string
+        , JD.field "message" JD.string
+        , JD.field "msg" JD.string
+        ]

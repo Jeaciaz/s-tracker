@@ -3,9 +3,10 @@ from datetime import datetime, timezone, timedelta
 import pyotp
 import jwt
 
-from ..dependencies import DepUserDAO, DepUserAuth
+from ..dependencies import DepUserDAO, DepUserAuth, DepFunnelDAO
 from ..exceptions import JwtTokenBlacklistedException
 from ..dto.users import *
+from ..dto.funnels import FunnelCreate
 from ..config import JWT_SECRET
 
 router = APIRouter(prefix="/user", tags=["user"])
@@ -59,12 +60,13 @@ def generate_otp_secret(body: GenerateSecretBody, user_dao: DepUserDAO):
     status_code=status.HTTP_200_OK,
     response_model=JwtPair,
 )
-def create_user(user: UserCreate, user_dao: DepUserDAO):
+def create_user(user: UserCreate, user_dao: DepUserDAO, funnel_dao: DepFunnelDAO):
     if not pyotp.TOTP(user.otp_secret).verify(user.otp_example):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid OTP"
         )
     user_dao.create(user)
+    funnel_dao.create_default_funnels(username=user.username)
     return generate_jwt_pair(user.username)
 
 

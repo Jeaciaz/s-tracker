@@ -1,5 +1,6 @@
 from fastapi import HTTPException, Depends
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from sqlalchemy import Connection
 from typing import Annotated
 import jwt
 
@@ -12,25 +13,30 @@ from .dao.users import UsersDAO
 from .dto.users import UserJwtPayload
 
 
-def get_funnel_dao():
+def _get_db_conn():
     with engine.begin() as conn:
-        yield FunnelDAO(conn, SpendingDAO(conn))
+        yield conn
+
+
+_DepDbConn = Annotated[Connection, Depends(_get_db_conn)]
+
+
+def get_funnel_dao(conn: _DepDbConn):
+    return FunnelDAO(conn, SpendingDAO(conn))
 
 
 DepFunnelDAO = Annotated[FunnelDAO, Depends(get_funnel_dao)]
 
 
-def get_spending_dao():
-    with engine.begin() as conn:
-        yield SpendingDAO(conn)
+def get_spending_dao(conn: _DepDbConn):
+    return SpendingDAO(conn)
 
 
 DepSpendingDAO = Annotated[SpendingDAO, Depends(get_spending_dao)]
 
 
-def get_user_dao():
-    with engine.begin() as conn:
-        yield UsersDAO(conn)
+def get_user_dao(conn: _DepDbConn):
+    return UsersDAO(conn)
 
 
 DepUserDAO = Annotated[UsersDAO, Depends(get_user_dao)]
