@@ -220,7 +220,7 @@ runLocalEffect effect =
                         requestTask
                             { method = Post (bodyWithoutTs |> Data.addTsToSpending ts |> Data.encodeSpending |> Http.jsonBody)
                             , headers = [ Data.getAuthHeader user ]
-                            , url = baseUrl ++ "/spending"
+                            , url = baseUrl ++ "/spending/"
                             , decoder = Data.decodeNothing
                             }
             in
