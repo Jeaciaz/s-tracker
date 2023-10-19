@@ -1,14 +1,13 @@
 module Dashboard exposing (Model, Msg, init, subscriptions, update, view)
 
+import Data as D
 import Date
 import Dict
 import Effect exposing (Effect)
 import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events exposing (..)
-import Http
 import Icons
-import Data as D
 import RemoteData as RD
 import Time
 import Utils
@@ -75,6 +74,7 @@ type Msg
     | SpendingsResponse (Effect.ResponseData Spendings)
     | AdjustTimeZone Time.Zone
     | CreateSpending String
+    | ErrorCreateSpending { amount : Float, funnelId : String } Bool Effect.ResponseError
     | ReloadData
 
 
@@ -86,6 +86,14 @@ update msg model =
 
         fetchSpendingsEffect =
             \user -> Effect.Local <| Effect.FetchSpendings model.baseUrl user SpendingsResponse
+
+        onCreateSpending req shouldRetryOnInvalidToken data =
+            case data of
+                RD.Failure detail ->
+                    ErrorCreateSpending req shouldRetryOnInvalidToken detail
+
+                _ ->
+                    ReloadData
     in
     case msg of
         UpdateDelta new ->
@@ -129,12 +137,34 @@ update msg model =
                                 model.baseUrl
                                 model.user
                                 { amount = delta, funnelId = funnelId }
-                                (\_ -> ReloadData)
+                                (onCreateSpending { amount = delta, funnelId = funnelId } True)
                       ]
                     )
 
                 Nothing ->
                     ( model, [] )
+
+        ErrorCreateSpending req shouldRetryOnInvalidToken error ->
+            case ( error, shouldRetryOnInvalidToken ) of
+                ( Effect.InvalidToken, True ) ->
+                    ( model
+                    , [ Effect.Global <|
+                            Effect.RevalidateToken model.baseUrl
+                                model.user
+                                (\newUser ->
+                                    Effect.Local <|
+                                        Effect.CreateSpending model.baseUrl newUser req (onCreateSpending req False)
+                                )
+                      ]
+                    )
+
+                ( Effect.InvalidToken, False ) ->
+                    ( model, [ Effect.Global <| Effect.Alert "Could not create spending, try again" ] )
+
+                ( Effect.Other detail, _ ) ->
+                    ( model
+                    , [ Effect.Global <| Effect.Alert detail ]
+                    )
 
         ReloadData ->
             ( { model | funnels = RD.Loading, spendings = RD.Loading }
