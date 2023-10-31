@@ -1,4 +1,4 @@
-# XTracker
+# STracker
 This is a personal project for me and my family to track expenses and plan our budget with some personal and shared spending categories (I call them funnels here).
 
 ## Deploy the app
