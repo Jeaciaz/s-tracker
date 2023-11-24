@@ -6,7 +6,6 @@ from sqlalchemy import pool
 from alembic import context
 
 
-# !IMPORTANT! IMPORT NEW TABLES HERE FOR AUTOGENERATE!!!
 from app.dao.tables import *
 from app.database import metadata_obj
 from app.config import DB_URL

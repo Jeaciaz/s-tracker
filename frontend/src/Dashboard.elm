@@ -1,5 +1,6 @@
 module Dashboard exposing (Model, Msg, init, subscriptions, update, view)
 
+import Clsx
 import Data as D
 import Date
 import Dict
@@ -8,7 +9,9 @@ import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events exposing (..)
 import Icons
+import Layout
 import RemoteData as RD
+import Route
 import Time
 import Utils
 
@@ -76,16 +79,17 @@ type Msg
     | CreateSpending String
     | ErrorCreateSpending { amount : Float, funnelId : String } Bool Effect.ResponseError
     | ReloadData
+    | GotoSettings
 
 
 update : Msg -> Model -> ( Model, List (Effect Msg) )
 update msg model =
     let
-        fetchFunnelsEffect =
-            \user -> Effect.Local <| Effect.FetchFunnels model.baseUrl user FunnelsResponse
+        fetchFunnelsEffect user =
+            Effect.Local <| Effect.FetchFunnels model.baseUrl user FunnelsResponse
 
-        fetchSpendingsEffect =
-            \user -> Effect.Local <| Effect.FetchSpendings model.baseUrl user SpendingsResponse
+        fetchSpendingsEffect user =
+            Effect.Local <| Effect.FetchSpendings model.baseUrl user SpendingsResponse
 
         onCreateSpending req shouldRetryOnInvalidToken data =
             case data of
@@ -173,6 +177,9 @@ update msg model =
               ]
             )
 
+        GotoSettings ->
+            ( model, [ Effect.Global <| Effect.GotoRoute model.user Route.Settings ] )
+
 
 
 -- SUBSCRIPTIONS
@@ -189,61 +196,50 @@ subscriptions _ =
 
 view : Model -> Html Msg
 view model =
-    main_ [ class "px-4 py-8 flex flex-col h-screen dark:bg-slate-700 dark:text-slate-100" ]
-        [ div [ class "flex justify-between" ]
-            [ h1 [ class "text-4xl" ] [ text "₪ Tracker" ]
-            , button [ class "p-1", onClick ReloadData, attribute "aria-label" "refresh" ]
-                [ Icons.refresh
+    Layout.viewContent
+        { headerContent =
+            div []
+                [ button [ class "p-1", onClick ReloadData, attribute "aria-label" "refresh" ]
+                    [ Icons.refresh ]
+                , button [ class "p-1", onClick GotoSettings, attribute "aria-label" "go to settings" ]
+                    [ Icons.edit ]
                 ]
-            ]
-        , div [ class "mt-6" ]
-            [ viewFunnels model
-            , input
-                [ class "mt-4 py-2 px-1 rounded border border-slate-300 w-full text-2xl dark:bg-slate-600 dark:border-0"
-                , attribute "inputmode" "numeric"
-                , value model.delta
-                , onInput UpdateDelta
-                , placeholder "20.5"
+        , content =
+            div [ class "flex flex-col gap-4 flex-grow" ]
+                [ viewFunnels model
+                , input
+                    [ class Clsx.input
+                    , class "w-full text-2xl"
+                    , attribute "inputmode" "numeric"
+                    , value model.delta
+                    , onInput UpdateDelta
+                    , placeholder "20.5"
+                    ]
+                    []
+                , Effect.foldResponse
+                    (\funnels ->
+                        div [ class "grid grid-cols-2" ] <|
+                            List.map
+                                (\funnel ->
+                                    button
+                                        [ class "py-2 active:brightness-75"
+                                        , style "background-color" funnel.color
+                                        , onClick (CreateSpending funnel.id)
+                                        ]
+                                        [ text funnel.emoji ]
+                                )
+                                funnels
+                    )
+                    model.funnels
+                , viewSpendings model
                 ]
-                []
-            , mapWebData model.funnels <|
-                \funnels ->
-                    div [ class "grid grid-cols-2 mt-4" ] <|
-                        List.map
-                            (\funnel ->
-                                button
-                                    [ class "py-2 active:brightness-75"
-                                    , style "background-color" funnel.color
-                                    , onClick (CreateSpending funnel.id)
-                                    ]
-                                    [ text funnel.emoji ]
-                            )
-                            funnels
-            ]
-        , viewSpendings model
-        ]
-
-
-mapWebData : Effect.ResponseData a -> (a -> Html Msg) -> Html Msg
-mapWebData model render =
-    case model of
-        RD.NotAsked ->
-            div [] []
-
-        RD.Loading ->
-            div [] []
-
-        RD.Failure _ ->
-            div [] [ text "error" ]
-
-        RD.Success data ->
-            render data
+        }
 
 
 viewFunnels : Model -> Html Msg
 viewFunnels model =
-    mapWebData model.funnels <|
-        \funnels ->
+    Effect.foldResponse
+        (\funnels ->
             div [ class "grid grid-cols-12 gap-2 items-end" ]
                 (funnels
                     |> List.concatMap
@@ -283,11 +279,13 @@ viewFunnels model =
                             ]
                         )
                 )
+        )
+        model.funnels
 
 
 viewSpendings : Model -> Html Msg
 viewSpendings model =
-    mapWebData (RD.map2 (\a b -> ( a, b )) model.funnels model.spendings)
+    Effect.foldResponse
         (\( funnels, spendings ) ->
             div [ class "relative grow" ]
                 [ div [ class "absolute inset-0 overflow-y-auto flex flex-col" ]
@@ -327,3 +325,4 @@ viewSpendings model =
                     )
                 ]
         )
+        (RD.map2 (\a b -> ( a, b )) model.funnels model.spendings)

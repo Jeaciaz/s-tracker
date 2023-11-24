@@ -1,15 +1,18 @@
 port module Main exposing (main)
 
-import Browser exposing (UrlRequest)
+import Browser
 import Browser.Navigation as Nav
 import Dashboard
+import Data as D
 import Effect exposing (Effect)
 import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events exposing (..)
 import Login
-import Data as D
 import RemoteData as RD
+import Route
+import Settings
+import Settings.FunnelForm
 import Url
 
 
@@ -46,6 +49,8 @@ main =
 type PageModel
     = DashboardPage Dashboard.Model
     | LoginPage Login.Model
+    | SettingsPage Settings.Model
+    | FunnelFormPage Settings.FunnelForm.Model
 
 
 type alias Model =
@@ -79,6 +84,23 @@ mapInit mapModel mapMsg ( modelA, effects ) =
     ( mapModel modelA, List.map (Effect.mapEffect mapMsg) effects )
 
 
+getInitPage : String -> D.User -> Url.Url -> ( PageModel, List (Effect Msg) )
+getInitPage baseUrl user url =
+    let
+        route =
+            Route.fromUrl url |> Maybe.withDefault Route.Dashboard
+    in
+    case route of
+        Route.Dashboard ->
+            Dashboard.init baseUrl user |> mapInit DashboardPage GotDashboardMsg
+
+        Route.Settings ->
+            Settings.init baseUrl user |> mapInit SettingsPage GotSettingsMsg
+
+        Route.FunnelForm funnelId ->
+            Settings.FunnelForm.init baseUrl user funnelId |> mapInit FunnelFormPage GotFunnelFormMsg
+
+
 init : Flags -> Url.Url -> Nav.Key -> ( Model, Cmd Msg )
 init { baseUrl, tokens } url key =
     let
@@ -99,7 +121,7 @@ init { baseUrl, tokens } url key =
                     Login.init baseUrl |> mapInit LoginPage GotLoginMsg
 
                 D.LoggedIn user ->
-                    Dashboard.init baseUrl user |> mapInit DashboardPage GotDashboardMsg
+                    getInitPage baseUrl user url
     in
     ( { page = model
       , auth = auth
@@ -121,6 +143,8 @@ init { baseUrl, tokens } url key =
 type Msg
     = GotDashboardMsg Dashboard.Msg
     | GotLoginMsg Login.Msg
+    | GotSettingsMsg Settings.Msg
+    | GotFunnelFormMsg Settings.FunnelForm.Msg
     | LinkClicked Browser.UrlRequest
     | UrlChanged Url.Url
     | UserUpdated (Maybe D.User)
@@ -166,6 +190,13 @@ update msg model =
                     , Cmd.none
                     )
 
+                ( GotSettingsMsg sMsg, SettingsPage sModel ) ->
+                    let
+                        ( newModel, sEffectList ) =
+                            Settings.update sMsg sModel
+                    in
+                    ( { model | page = SettingsPage newModel, effectQueue = model.effectQueue ++ mapEffectQueue GotSettingsMsg sEffectList }, Cmd.none )
+
                 ( UserUpdated maybeUser, _ ) ->
                     case maybeUser of
                         Just user ->
@@ -173,16 +204,23 @@ update msg model =
                                 ( newModel, effectCmd ) =
                                     runGlobalEffect model (Effect.SaveTokens user)
                             in
-                            ( { newModel 
-                                | auth = D.LoggedIn user 
+                            ( { newModel
+                                | auth = D.LoggedIn user
                                 , effectQueue = List.map (\f -> f user) model.refetchQueue
                                 , refetchQueue = []
-                            }
+                              }
                             , effectCmd
                             )
 
                         Nothing ->
                             ( { model | auth = D.LoggedOut, page = LoginPage <| Tuple.first <| Login.init model.baseUrl }, Cmd.none )
+
+                ( GotFunnelFormMsg localMsg, FunnelFormPage localModel ) ->
+                    let
+                        ( newModel, effectList ) =
+                            Settings.FunnelForm.update localMsg localModel
+                    in
+                    ( { model | page = FunnelFormPage newModel, effectQueue = model.effectQueue ++ mapEffectQueue GotFunnelFormMsg effectList }, Cmd.none )
 
                 ( _, _ ) ->
                     ( model, Cmd.none )
@@ -234,17 +272,28 @@ runGlobalEffect model effect =
                 _ ->
                     ( { model | refetchQueue = genMsg :: model.refetchQueue }, Cmd.none )
 
-        Effect.GotoHomePage user ->
+        Effect.GotoRoute user route ->
             let
+                packModel mapModel mapFx ( m, fx ) =
+                    ( mapModel m, List.map (Effect.mapEffect mapFx) fx )
+
                 ( pageModel, pageEffects ) =
-                    Dashboard.init model.baseUrl user
+                    case route of
+                        Route.Dashboard ->
+                            Dashboard.init model.baseUrl user |> packModel DashboardPage GotDashboardMsg
+
+                        Route.Settings ->
+                            Settings.init model.baseUrl user |> packModel SettingsPage GotSettingsMsg
+
+                        Route.FunnelForm maybeId ->
+                            Settings.FunnelForm.init model.baseUrl user maybeId |> packModel FunnelFormPage GotFunnelFormMsg
             in
             ( { model
                 | auth = D.LoggedIn user
-                , page = DashboardPage pageModel
-                , effectQueue = model.effectQueue ++ List.map (Effect.mapEffect GotDashboardMsg) pageEffects
+                , page = pageModel
+                , effectQueue = model.effectQueue ++ pageEffects
               }
-            , Cmd.none
+            , Route.goto model.navKey route
             )
                 |> runEffects
 
@@ -261,8 +310,14 @@ subscriptions model =
                 DashboardPage dModel ->
                     Sub.map GotDashboardMsg <| Dashboard.subscriptions dModel
 
-                LoginPage lModel ->
-                    Sub.map GotLoginMsg <| Login.subscriptions lModel
+                LoginPage localModel ->
+                    Sub.map GotLoginMsg <| Login.subscriptions localModel
+
+                SettingsPage localModel ->
+                    Sub.map GotSettingsMsg <| Settings.subscriptions localModel
+
+                FunnelFormPage localModel ->
+                    Sub.map GotFunnelFormMsg <| Settings.FunnelForm.subscriptions localModel
     in
     Sub.batch [ pageSub, D.tokensUpdated UserUpdated ]
 
@@ -276,10 +331,16 @@ view model =
     { title = "₪ Tracker"
     , body =
         [ case model.page of
-            DashboardPage dModel ->
-                Dashboard.view dModel |> Html.map GotDashboardMsg
+            DashboardPage localModel ->
+                Dashboard.view localModel |> Html.map GotDashboardMsg
 
-            LoginPage lModel ->
-                Login.view lModel |> Html.map GotLoginMsg
+            LoginPage localModel ->
+                Login.view localModel |> Html.map GotLoginMsg
+
+            SettingsPage localModel ->
+                Settings.view localModel |> Html.map GotSettingsMsg
+
+            FunnelFormPage localModel ->
+                Settings.FunnelForm.view localModel |> Html.map GotFunnelFormMsg
         ]
     }

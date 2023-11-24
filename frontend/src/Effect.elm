@@ -1,9 +1,22 @@
-module Effect exposing (Effect(..), GlobalEffect(..), LocalEffect(..), ResponseData, ResponseError(..), mapEffect, mapLocalEffect, revalidateRequest, runLocalEffect)
+module Effect exposing
+    ( Effect(..)
+    , GlobalEffect(..)
+    , LocalEffect(..)
+    , ResponseData
+    , ResponseError(..)
+    , foldResponse
+    , mapEffect
+    , mapLocalEffect
+    , revalidateRequest
+    , runLocalEffect
+    )
 
 import Data exposing (User)
+import Html exposing (Html, div, text)
 import Http
 import Json.Decode as JD
 import RemoteData as RD
+import Route
 import Task
 import Time
 import Utils
@@ -16,6 +29,22 @@ type ResponseError
 
 type alias ResponseData res =
     RD.RemoteData ResponseError res
+
+
+foldResponse : (a -> Html msg) -> ResponseData a -> Html msg
+foldResponse render model =
+    case model of
+        RD.NotAsked ->
+            div [] []
+
+        RD.Loading ->
+            div [] []
+
+        RD.Failure _ ->
+            div [] [ text "error" ]
+
+        RD.Success data ->
+            render data
 
 
 type HttpMethod
@@ -37,6 +66,8 @@ type LocalEffect msgOnSuccess
     | RegisterNewUser String Data.RegisterRequest (ResponseData User -> msgOnSuccess)
     | Login String Data.LoginRequest (ResponseData User -> msgOnSuccess)
     | CreateSpending String User Data.SpendingCreateWithoutTs (ResponseData () -> msgOnSuccess)
+    | FetchFunnel String User String (ResponseData Data.Funnel -> msgOnSuccess)
+    | UpdateFunnel String User Data.FunnelPut (ResponseData () -> msgOnSuccess)
 
 
 type GlobalEffect msgOnSuccess
@@ -44,14 +75,17 @@ type GlobalEffect msgOnSuccess
     | Alert String
     | SaveTokens User
     | RevalidateToken String User (User -> Effect msgOnSuccess)
-    | GotoHomePage User
+    | GotoRoute User Route.Route
 
+type ResponseDecoder response
+    = JsonDecoder (JD.Decoder response)
+    | StaticValue response
 
 type alias RequestConfig response =
     { method : HttpMethod
     , url : String
     , headers : List Http.Header
-    , decoder : JD.Decoder response
+    , decoder : ResponseDecoder response
     }
 
 
@@ -83,9 +117,13 @@ requestTask { method, url, headers, decoder } =
                 (\res ->
                     case res of
                         Http.GoodStatus_ _ resText ->
-                            resText
-                                |> JD.decodeString decoder
-                                |> Result.mapError (JD.errorToString >> Other)
+                            case decoder of
+                                JsonDecoder actualDecoder ->
+                                    resText
+                                        |> JD.decodeString actualDecoder
+                                        |> Result.mapError (JD.errorToString >> Other)
+                                StaticValue value ->
+                                    Result.Ok value
 
                         Http.BadUrl_ url_ ->
                             Result.Err (Http.BadUrl url_ |> Utils.errorToString |> Other)
@@ -133,6 +171,12 @@ mapLocalEffect f effect =
         CreateSpending baseUrl user bodyWithoutTs genMsg ->
             CreateSpending baseUrl user bodyWithoutTs (genMsg >> f)
 
+        FetchFunnel baseUrl user id genMsg ->
+            FetchFunnel baseUrl user id (genMsg >> f)
+
+        UpdateFunnel baseUrl user funnel genMsg ->
+            UpdateFunnel baseUrl user funnel (genMsg >> f)
+
 
 mapGlobalEffect : (a -> b) -> GlobalEffect a -> GlobalEffect b
 mapGlobalEffect f effect =
@@ -149,8 +193,8 @@ mapGlobalEffect f effect =
         SaveTokens user ->
             SaveTokens user
 
-        GotoHomePage user ->
-            GotoHomePage user
+        GotoRoute user route ->
+            GotoRoute user route
 
 
 mapEffect : (a -> b) -> Effect a -> Effect b
@@ -171,7 +215,7 @@ runLocalEffect effect =
                 { method = Get
                 , headers = [ Data.getAuthHeader user ]
                 , url = baseUrl ++ "/funnel/"
-                , decoder = Data.decodeFunnels
+                , decoder = JsonDecoder Data.decodeFunnels
                 }
                 |> Task.perform genMsg
 
@@ -180,7 +224,7 @@ runLocalEffect effect =
                 { method = Get
                 , headers = [ Data.getAuthHeader user ]
                 , url = baseUrl ++ "/spending/"
-                , decoder = Data.decodeSpendings
+                , decoder = JsonDecoder Data.decodeSpendings
                 }
                 |> Task.perform genMsg
 
@@ -189,7 +233,7 @@ runLocalEffect effect =
                 { method = Post (body |> Data.encodeOtpSecretRequest |> Http.jsonBody)
                 , headers = []
                 , url = baseUrl ++ "/user/generate-otp-secret"
-                , decoder = Data.decodeOtpSecret
+                , decoder = JsonDecoder Data.decodeOtpSecret
                 }
                 |> Task.perform genMsg
 
@@ -198,7 +242,7 @@ runLocalEffect effect =
                 { method = Post (body |> Data.encodeRegisterRequest |> Http.jsonBody)
                 , headers = []
                 , url = baseUrl ++ "/user/"
-                , decoder = Data.decodeUserFromTokenPairResponse
+                , decoder = JsonDecoder Data.decodeUserFromTokenPairResponse
                 }
                 |> Task.map extractMaybeUser
                 |> Task.perform genMsg
@@ -208,7 +252,7 @@ runLocalEffect effect =
                 { method = Post (body |> Data.encodeLoginRequest |> Http.jsonBody)
                 , headers = []
                 , url = baseUrl ++ "/user/login"
-                , decoder = Data.decodeUserFromTokenPairResponse
+                , decoder = JsonDecoder Data.decodeUserFromTokenPairResponse
                 }
                 |> Task.map extractMaybeUser
                 |> Task.perform genMsg
@@ -221,10 +265,30 @@ runLocalEffect effect =
                             { method = Post (bodyWithoutTs |> Data.addTsToSpending ts |> Data.encodeSpending |> Http.jsonBody)
                             , headers = [ Data.getAuthHeader user ]
                             , url = baseUrl ++ "/spending/"
-                            , decoder = Data.decodeNothing
+                            , decoder = StaticValue ()
                             }
             in
             Task.perform genMsg (Time.now |> Task.map Time.posixToMillis |> Task.andThen req)
+
+        FetchFunnel baseUrl user id genMsg ->
+            requestTask
+                { method = Get
+                , headers = [ Data.getAuthHeader user ]
+                , url = baseUrl ++ "/funnel/" ++ id
+                , decoder = JsonDecoder Data.decodeFunnel
+                }
+                |> Task.perform genMsg
+
+
+        UpdateFunnel baseUrl user funnel genMsg ->
+            let body = funnel |> Data.encodeFunnelPut |> Http.jsonBody in
+            requestTask
+                { method = Put body
+                , headers = [ Data.getAuthHeader user ]
+                , url = baseUrl ++ "/funnel/" ++ funnel.id 
+                , decoder = StaticValue ()
+                }
+                |> Task.perform genMsg
 
 
 revalidateRequest : String -> User -> (ResponseData User -> msg) -> Cmd msg
@@ -233,7 +297,7 @@ revalidateRequest baseUrl user genMsg =
         { method = Post (user |> Data.encodeRefreshRequest |> Http.jsonBody)
         , headers = []
         , url = baseUrl ++ "/user/refresh"
-        , decoder = Data.decodeUserFromTokenPairResponse
+        , decoder = JsonDecoder Data.decodeUserFromTokenPairResponse
         }
         |> Task.map extractMaybeUser
         |> Task.perform genMsg

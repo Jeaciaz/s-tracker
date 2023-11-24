@@ -6,7 +6,7 @@
   "license": "MIT",
   "scripts": {
     "dev": "vite & npm run tw:dev",
-		"tw:build": "npx tailwindcss -i ./tailwind.css -o ./src/compiled-styles.css",
+		"tw:build": "npx tailwindcss -i ./global.css -o ./src/compiled-styles.css",
 		"tw:dev": "npm run tw:build -- --watch",
     "build": "npm run tw:build && vite build",
     "serve": "vite preview",

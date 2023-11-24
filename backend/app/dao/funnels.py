@@ -64,6 +64,14 @@ class FunnelDAO(BaseDAO):
         ).all()
         return [self.from_row(row._asdict()) for row in result]
 
+    def get(self, id: UUID, username: str) -> FunnelPublic:
+        result = self._connection.execute(
+            sa.select(funnels_table)
+            .where(funnels_table.c.user_name == username)
+            .where(funnels_table.c.id == str(id))
+        ).one_or_none()
+        return self.from_row(result._asdict())
+
     def create(self, *funnels: FunnelCreate) -> UUID:
         result = self._connection.execute(
             sa.insert(funnels_table),
@@ -84,6 +92,5 @@ class FunnelDAO(BaseDAO):
         result = self._connection.execute(
             sa.delete(funnels_table).where(funnels_table.c.id == str(id))
         )
-        print(result, result.rowcount)
         if result.rowcount == 0:
             raise FunnelDoesNotExistException()

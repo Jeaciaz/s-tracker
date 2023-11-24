@@ -23,6 +23,19 @@ def funnels_list(funnel_dao: DepFunnelDAO, user: DepUserAuth):
     return funnel_dao.get_all(user.username)
 
 
+@router.get(
+    "/{funnel_id}",
+    summary="Get a single funnel",
+    status_code=200,
+    response_model=FunnelPublic,
+)
+def get_funnel(funnel_id: UUID, funnel_dao: DepFunnelDAO, user: DepUserAuth):
+    result = funnel_dao.get(funnel_id, user.username)
+    if result is None:
+        raise HTTPException(status_code=404, detail="Funnel not found")
+    return result
+
+
 @router.post(
     "/",
     summary="Create a new funnel",
@@ -58,7 +71,7 @@ def update_funnel(
     "/{funnel_id}",
     summary="Delete a funnel",
     status_code=status.HTTP_204_NO_CONTENT,
-    dependencies=[VoidDepUserAuth]
+    dependencies=[VoidDepUserAuth],
 )
 def delete_funnel(funnel_id: UUID, funnel_dao: DepFunnelDAO):
     try:

@@ -1,6 +1,7 @@
 port module Data exposing
     ( Auth(..)
     , Funnel
+    , FunnelPut
     , Funnels
     , LoginRequest
     , OtpSecretRequest
@@ -13,12 +14,14 @@ port module Data exposing
     , User
     , UserData
     , addTsToSpending
+    , decodeFunnel
     , decodeFunnels
     , decodeNothing
     , decodeOtpSecret
     , decodeServerError
     , decodeSpendings
     , decodeUserFromTokenPairResponse
+    , encodeFunnelPut
     , encodeLoginRequest
     , encodeOtpSecretRequest
     , encodeRefreshRequest
@@ -69,22 +72,39 @@ type alias Funnel =
     }
 
 
+type alias FunnelPut =
+    { name : String
+    , limit : Float
+    , color : String
+    , emoji : String
+    , id : String
+    }
+
+
 type alias Funnels =
     List Funnel
 
 
+decodeFunnel : JD.Decoder Funnel
+decodeFunnel =
+    JD.map7 Funnel
+        (JD.field "name" JD.string)
+        (JD.field "color" JD.string)
+        (JD.field "emoji" JD.string)
+        (JD.field "remaining" JD.float)
+        (JD.field "limit" JD.float)
+        (JD.field "daily" JD.float)
+        (JD.field "id" JD.string)
+
+
 decodeFunnels : JD.Decoder Funnels
 decodeFunnels =
-    JD.list
-        (JD.map7 Funnel
-            (JD.field "name" JD.string)
-            (JD.field "color" JD.string)
-            (JD.field "emoji" JD.string)
-            (JD.field "remaining" JD.float)
-            (JD.field "limit" JD.float)
-            (JD.field "daily" JD.float)
-            (JD.field "id" JD.string)
-        )
+    JD.list decodeFunnel
+
+
+encodeFunnelPut : FunnelPut -> JE.Value
+encodeFunnelPut { name, limit, color, emoji } =
+    JE.object [ ( "name", JE.string name ), ( "limit", JE.float limit ), ( "color", JE.string color ), ( "emoji", JE.string emoji ) ]
 
 
 type alias Spending =

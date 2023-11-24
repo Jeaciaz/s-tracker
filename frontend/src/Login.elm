@@ -7,6 +7,7 @@ import Html.Attributes exposing (..)
 import Html.Events exposing (..)
 import Layout
 import RemoteData as RD
+import Route exposing (Route)
 import Ui.Button
 import Ui.Input
 import Utils
@@ -158,7 +159,7 @@ updateRegisterModel msg model baseUrl =
         NewUserRegistered userRd ->
             case RD.toMaybe userRd of
                 Just user ->
-                    ( Register model, [ Effect.Global <| Effect.GotoHomePage user ] )
+                    ( Register model, [ Effect.Global <| Effect.GotoRoute user Route.Dashboard ] )
 
                 Nothing ->
                     ( Register model, [ Effect.Global <| Effect.Alert "Registration unsuccessful" ] )
@@ -191,7 +192,7 @@ updateLoginModel msg model baseUrl =
                             [ Effect.Global <| Effect.Alert "Login unsuccessful" ]
 
                         Just user ->
-                            [ Effect.Global <| Effect.SaveTokens user, Effect.Global <| Effect.GotoHomePage user ]
+                            [ Effect.Global <| Effect.SaveTokens user, Effect.Global <| Effect.GotoRoute user Route.Dashboard ]
             in
             ( Login { model | isSubmitting = False }, effects )
 

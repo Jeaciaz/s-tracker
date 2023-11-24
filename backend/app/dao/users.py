@@ -27,7 +27,7 @@ class UsersDAO(BaseDAO):
     
     def _check_token_blacklist(self, username: str, token_iat: int):
         blacklist_entry = self._connection.execute(sa.select(jwt_blacklist_table).where(jwt_blacklist_table.c.username == username)).one_or_none()
-        return blacklist_entry is None or blacklist_entry[1] < token_iat 
+        return blacklist_entry is None or blacklist_entry[1] <= token_iat 
 
     def decode_token(self, token: str):
         decoded = jwt.decode(token, JWT_SECRET, algorithms=["HS256"])

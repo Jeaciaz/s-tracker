@@ -1,4 +1,4 @@
-module Route exposing (Route(..), fromUrl, href, replaceUrl)
+module Route exposing (Route(..), fromUrl, goto, homePage, href, replaceUrl)
 
 import Browser.Navigation as Nav
 import Html exposing (Attribute)
@@ -8,20 +8,28 @@ import Url.Parser as Parser exposing ((</>), Parser, oneOf, s)
 
 
 type Route
-    = Login
+    = Settings
     | Dashboard
+    | FunnelForm (Maybe String)
 
 
 parser : Parser (Route -> a) a
 parser =
     oneOf
-        [ Parser.map Dashboard Parser.top
-        , Parser.map Login (s "login")
+        [ Parser.map Settings (s "settings")
+        , Parser.map (Just >> FunnelForm) (s "funnel" </> Parser.string)
+        , Parser.map (FunnelForm Nothing) (s "funnel")
+        , Parser.map Dashboard Parser.top
         ]
 
 
 
 -- PUBLIC HELPERS
+
+
+homePage : String
+homePage =
+    routeToString Dashboard
 
 
 href : Route -> Attribute msg
@@ -39,6 +47,11 @@ fromUrl url =
     { url | path = Maybe.withDefault "" url.fragment, fragment = Nothing } |> Parser.parse parser
 
 
+goto : Nav.Key -> Route -> Cmd msg
+goto key route =
+    Nav.pushUrl key (routeToString route)
+
+
 
 -- INTERNAL
 
@@ -54,5 +67,13 @@ routeToPieces route =
         Dashboard ->
             []
 
-        Login ->
-            [ "login" ]
+        Settings ->
+            [ "settings" ]
+
+        FunnelForm funnelId ->
+            case funnelId of
+                Just id ->
+                    [ "funnel", id ]
+
+                Nothing ->
+                    [ "funnel" ]
