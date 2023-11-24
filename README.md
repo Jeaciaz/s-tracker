@@ -14,6 +14,7 @@ Running the development version is trickier, and will be described later.
 
 ## ENV Variables
 `DB_URL` - the string that indicates where the DB will be. See https://docs.sqlalchemy.org/en/20/core/engines.html#sqlalchemy.create_engine
+
 `JWT_SECRET` - a secret key for generating JWTs for auth
 
 ## Dev build
@@ -21,7 +22,7 @@ To run frontend:
 ```cd frontend && npm run dev```
 
 To run backend:
-```cd backend && alembic upgrade head && uvicorn app.main:app --reload```
+```cd backend && sh dev.sh```
 
 ## Run tests
 After doing `cd backend`:
@@ -35,3 +36,4 @@ This project uses:
 - SqlAlchemy Core
 - SQLite
 - Pytest
+- Elm
