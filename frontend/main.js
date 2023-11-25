@@ -33,10 +33,18 @@ app.ports.copyText.subscribe(function (text) {
 
 app.ports.alert.subscribe(alert.bind(window));
 
+app.ports.prompt.subscribe(function ([text, id]) {
+  const result = confirm(text);
+  app.ports.promptResult.send([id, result]);
+});
+
 app.ports.saveTokensPort.subscribe(function ({ access, refresh }) {
-	if (localStorage.getItem("access") === access && localStorage.getItem("refresh") === refresh) {
-		return
-	}
+  if (
+    localStorage.getItem("access") === access &&
+    localStorage.getItem("refresh") === refresh
+  ) {
+    return;
+  }
   localStorage.setItem("access", access);
   localStorage.setItem("refresh", refresh);
   app.ports.tokensUpdatedPort.send({ access, refresh });

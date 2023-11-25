@@ -68,18 +68,23 @@ type LocalEffect msgOnSuccess
     | CreateSpending String User Data.SpendingCreateWithoutTs (ResponseData () -> msgOnSuccess)
     | FetchFunnel String User String (ResponseData Data.Funnel -> msgOnSuccess)
     | UpdateFunnel String User Data.FunnelPut (ResponseData () -> msgOnSuccess)
+    | DeleteFunnel String User String (ResponseData () -> msgOnSuccess)
+    | CreateFunnel String User Data.FunnelPost (ResponseData String -> msgOnSuccess)
 
 
 type GlobalEffect msgOnSuccess
     = CopyText String
     | Alert String
+    | Prompt String (Effect msgOnSuccess)
     | SaveTokens User
     | RevalidateToken String User (User -> Effect msgOnSuccess)
     | GotoRoute User Route.Route
 
+
 type ResponseDecoder response
     = JsonDecoder (JD.Decoder response)
     | StaticValue response
+
 
 type alias RequestConfig response =
     { method : HttpMethod
@@ -122,6 +127,7 @@ requestTask { method, url, headers, decoder } =
                                     resText
                                         |> JD.decodeString actualDecoder
                                         |> Result.mapError (JD.errorToString >> Other)
+
                                 StaticValue value ->
                                     Result.Ok value
 
@@ -177,6 +183,12 @@ mapLocalEffect f effect =
         UpdateFunnel baseUrl user funnel genMsg ->
             UpdateFunnel baseUrl user funnel (genMsg >> f)
 
+        DeleteFunnel baseUrl user funnelId genMsg ->
+            DeleteFunnel baseUrl user funnelId (genMsg >> f)
+
+        CreateFunnel baseUrl user funnel genMsg ->
+            CreateFunnel baseUrl user funnel (genMsg >> f)
+
 
 mapGlobalEffect : (a -> b) -> GlobalEffect a -> GlobalEffect b
 mapGlobalEffect f effect =
@@ -189,6 +201,9 @@ mapGlobalEffect f effect =
 
         Alert s ->
             Alert s
+
+        Prompt text effectOnConfirm ->
+            Prompt text (mapEffect f effectOnConfirm)
 
         SaveTokens user ->
             SaveTokens user
@@ -279,14 +294,34 @@ runLocalEffect effect =
                 }
                 |> Task.perform genMsg
 
-
         UpdateFunnel baseUrl user funnel genMsg ->
-            let body = funnel |> Data.encodeFunnelPut |> Http.jsonBody in
+            let
+                body =
+                    funnel |> Data.encodeFunnelPut |> Http.jsonBody
+            in
             requestTask
                 { method = Put body
                 , headers = [ Data.getAuthHeader user ]
-                , url = baseUrl ++ "/funnel/" ++ funnel.id 
+                , url = baseUrl ++ "/funnel/" ++ funnel.id
                 , decoder = StaticValue ()
+                }
+                |> Task.perform genMsg
+
+        DeleteFunnel baseUrl user funnelId genMsg ->
+            requestTask
+                { method = Delete Http.emptyBody
+                , headers = [ Data.getAuthHeader user ]
+                , url = baseUrl ++ "/funnel/" ++ funnelId
+                , decoder = StaticValue ()
+                }
+                |> Task.perform genMsg
+
+        CreateFunnel baseUrl user funnel genMsg ->
+            requestTask
+                { method = Post (funnel |> Data.encodeFunnelPost |> Http.jsonBody)
+                , headers = [ Data.getAuthHeader user ]
+                , url = baseUrl ++ "/funnel/"
+                , decoder = JsonDecoder JD.string
                 }
                 |> Task.perform genMsg
 

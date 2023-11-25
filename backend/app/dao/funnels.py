@@ -77,7 +77,7 @@ class FunnelDAO(BaseDAO):
             sa.insert(funnels_table),
             [{**funnel.dict(), "id": str(uuid4())} for funnel in funnels],
         )
-        return result.inserted_primary_key_rows
+        return result.inserted_primary_key_rows[0][0]
 
     def update(self, id: UUID, funnel: FunnelCreate):
         result = self._connection.execute(

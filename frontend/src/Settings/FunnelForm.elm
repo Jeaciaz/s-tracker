@@ -80,8 +80,8 @@ init url user maybeFunnelId =
       , formState =
             { emoji = initialFormField ""
             , name = initialFormField ""
-            , color = initialFormField ""
-            , limit = initialFormField ""
+            , color = initialFormField "mediumseagreen"
+            , limit = initialFormField "1000"
             }
       }
     , case maybeFunnelId of
@@ -104,20 +104,28 @@ type Msg
     | SetName String
     | SetColor String
     | SetLimit String
-    | NewDataSubmitted Data.FunnelPut (Effect.ResponseData ()) -- response and request model
+    | NewDataSubmitted (Data.User -> Effect Msg) (Effect.ResponseData ()) -- response and request model
     | CloseForm
 
 
 update : Msg -> Model -> ( Model, List (Effect Msg) )
 update msg model =
     let
-        updateFunnelEffect body user =
+        updateFunnelEffect body user retryEffect =
             Effect.Local <|
                 Effect.UpdateFunnel
                     model.baseUrl
                     user
                     body
-                    (NewDataSubmitted body)
+                    (NewDataSubmitted retryEffect)
+
+        createFunnelEffect body user retryEffect =
+            Effect.Local <|
+                Effect.CreateFunnel
+                    model.baseUrl
+                    user
+                    body
+                    (RD.map (\_ -> ()) >> NewDataSubmitted retryEffect)
     in
     case msg of
         GotFunnelData id data ->
@@ -160,30 +168,45 @@ update msg model =
                     ( model
                     , case model.formType of
                         EditFunnel id _ ->
-                            [ updateFunnelEffect
-                                { name = model.formState.name.value
-                                , limit = limit
-                                , color = model.formState.color.value
-                                , emoji = model.formState.emoji.value
-                                , id = id
-                                }
-                                model.user
-                            ]
+                            let
+                                body =
+                                    { name = model.formState.name.value
+                                    , limit = limit
+                                    , color = model.formState.color.value
+                                    , emoji = model.formState.emoji.value
+                                    , id = id
+                                    }
+
+                                retry user =
+                                    updateFunnelEffect body user retry
+                            in
+                            [ retry model.user ]
 
                         CreateFunnel ->
-                            []
+                            let
+                                body =
+                                    { name = model.formState.name.value
+                                    , limit = limit
+                                    , color = model.formState.color.value
+                                    , emoji = model.formState.emoji.value
+                                    }
+
+                                retry user =
+                                    createFunnelEffect body user retry
+                            in
+                            [ retry model.user ]
                     )
 
                 Nothing ->
                     ( model, [] )
 
-        NewDataSubmitted body response ->
+        NewDataSubmitted retry response ->
             case response of
                 RD.Success () ->
                     ( model, [ Effect.Global <| Effect.GotoRoute model.user Route.Settings ] )
 
                 RD.Failure Effect.InvalidToken ->
-                    ( model, [ Effect.Global <| Effect.RevalidateToken model.baseUrl model.user (updateFunnelEffect body) ] )
+                    ( model, [ Effect.Global <| Effect.RevalidateToken model.baseUrl model.user retry ] )
 
                 RD.Failure (Effect.Other detail) ->
                     ( model, [ Effect.Global <| Effect.Alert detail ] )

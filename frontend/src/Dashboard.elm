@@ -131,7 +131,9 @@ update msg model =
         CreateSpending funnelId ->
             let
                 amount =
-                    String.toFloat model.delta
+                    model.delta
+                        |> String.replace "," "."
+                        |> String.toFloat
             in
             case amount of
                 Just delta ->

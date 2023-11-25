@@ -41,6 +41,9 @@ type Msg
     = GotoHomePage
     | GotFunnels (Effect.ResponseData Data.Funnels)
     | GotoFunnel String
+    | CreateFunnel
+    | DeleteFunnel String String
+    | ReloadFunnels
 
 
 update : Msg -> Model -> ( Model, List (Effect Msg) )
@@ -73,6 +76,21 @@ update msg model =
         GotoFunnel id ->
             ( model, [ Effect.Global <| Effect.GotoRoute model.user (Route.FunnelForm (Just id)) ] )
 
+        CreateFunnel ->
+            ( model, [ Effect.Global <| Effect.GotoRoute model.user (Route.FunnelForm Nothing) ] )
+
+        DeleteFunnel id name ->
+            ( model
+            , [ Effect.Global <|
+                    Effect.Prompt
+                        ("Are you sure you want to delete funnel \"" ++ name ++ "\"?")
+                        (Effect.Local <| Effect.DeleteFunnel model.baseUrl model.user id (\_ -> ReloadFunnels))
+              ]
+            )
+
+        ReloadFunnels ->
+            ( model, [ fetchFunnelsEffect model.user ] )
+
 
 
 -- SUBSCRIPTIONS
@@ -101,7 +119,7 @@ view model =
                 , Effect.foldResponse
                     viewFunnels
                     model.funnels
-                -- , button [ class "mt-8 border w-full flex justify-center active:bg-slate-600 rounded py-2" ] [ Icons.plus ]
+                , button [ HE.onClick CreateFunnel, class "mt-8 border w-full flex justify-center active:bg-slate-600 rounded py-2" ] [ Icons.plus ]
                 ]
         }
 
@@ -121,7 +139,7 @@ viewFunnels funnels =
                         , attribute "aria-label" "Edit funnel"
                         ]
                         [ Icons.edit ]
-                    -- , button [ class Clsx.iconButton, attribute "aria-label" "Delete funnel" ] [ Icons.delete ]
+                    , button [ HE.onClick (DeleteFunnel funnel.id funnel.name), class Clsx.iconButton, attribute "aria-label" "Delete funnel" ] [ Icons.delete ]
                     , div [ class "absolute bottom-0 h-0.5 w-1/2 rounded", style "background-color" funnel.color ] []
                     , div [ class "absolute bottom-0 h-0.5 w-full rounded opacity-50", style "background-color" funnel.color ] []
                     ]

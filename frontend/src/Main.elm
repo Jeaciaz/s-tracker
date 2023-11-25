@@ -4,6 +4,7 @@ import Browser
 import Browser.Navigation as Nav
 import Dashboard
 import Data as D
+import Dict exposing (Dict)
 import Effect exposing (Effect)
 import Html exposing (..)
 import Html.Attributes exposing (..)
@@ -24,6 +25,12 @@ port copyText : String -> Cmd msg
 
 
 port alert : String -> Cmd msg
+
+
+port prompt : ( String, Int ) -> Cmd msg
+
+
+port promptResult : (( Int, Bool ) -> msg) -> Sub msg
 
 
 
@@ -61,6 +68,7 @@ type alias Model =
     , refetchQueue : List (D.User -> Effect Msg)
     , baseUrl : String
     , url : Url.Url
+    , promptQueue : Dict Int (Effect Msg)
     }
 
 
@@ -130,6 +138,7 @@ init { baseUrl, tokens } url key =
       , refetchQueue = []
       , baseUrl = baseUrl
       , url = url
+      , promptQueue = Dict.empty
       }
     , Cmd.none
     )
@@ -148,6 +157,7 @@ type Msg
     | LinkClicked Browser.UrlRequest
     | UrlChanged Url.Url
     | UserUpdated (Maybe D.User)
+    | GotPromptResult ( Int, Bool )
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -165,6 +175,15 @@ update msg model =
 
                 ( UrlChanged url, _ ) ->
                     ( { model | url = url }, Cmd.none )
+
+                ( GotPromptResult ( id, result ), _ ) ->
+                    case ( result, Dict.get id model.promptQueue ) of
+                        ( True, Just effect ) ->
+                            ( { model | promptQueue = Dict.remove id model.promptQueue, effectQueue = effect :: model.effectQueue }, Cmd.none )
+                                |> runEffects
+
+                        _ ->
+                            ( { model | promptQueue = Dict.remove id model.promptQueue }, Cmd.none )
 
                 ( GotDashboardMsg pMsg, DashboardPage pModel ) ->
                     let
@@ -256,6 +275,13 @@ runGlobalEffect model effect =
         Effect.Alert text ->
             ( model, alert text )
 
+        Effect.Prompt text effectOnConfirm ->
+            let
+                key =
+                    Dict.size model.promptQueue
+            in
+            ( { model | promptQueue = Dict.insert key effectOnConfirm model.promptQueue }, prompt ( text, key ) )
+
         Effect.SaveTokens user ->
             ( model, D.saveTokens user )
 
@@ -319,7 +345,7 @@ subscriptions model =
                 FunnelFormPage localModel ->
                     Sub.map GotFunnelFormMsg <| Settings.FunnelForm.subscriptions localModel
     in
-    Sub.batch [ pageSub, D.tokensUpdated UserUpdated ]
+    Sub.batch [ pageSub, D.tokensUpdated UserUpdated, promptResult GotPromptResult ]
 
 
 

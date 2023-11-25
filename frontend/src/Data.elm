@@ -1,6 +1,7 @@
 port module Data exposing
     ( Auth(..)
     , Funnel
+    , FunnelPost
     , FunnelPut
     , Funnels
     , LoginRequest
@@ -21,6 +22,7 @@ port module Data exposing
     , decodeServerError
     , decodeSpendings
     , decodeUserFromTokenPairResponse
+    , encodeFunnelPost
     , encodeFunnelPut
     , encodeLoginRequest
     , encodeOtpSecretRequest
@@ -72,6 +74,14 @@ type alias Funnel =
     }
 
 
+type alias FunnelPost =
+    { name : String
+    , limit : Float
+    , color : String
+    , emoji : String
+    }
+
+
 type alias FunnelPut =
     { name : String
     , limit : Float
@@ -102,9 +112,14 @@ decodeFunnels =
     JD.list decodeFunnel
 
 
-encodeFunnelPut : FunnelPut -> JE.Value
-encodeFunnelPut { name, limit, color, emoji } =
+encodeFunnelPost : FunnelPost -> JE.Value
+encodeFunnelPost { name, limit, color, emoji } =
     JE.object [ ( "name", JE.string name ), ( "limit", JE.float limit ), ( "color", JE.string color ), ( "emoji", JE.string emoji ) ]
+
+
+encodeFunnelPut : FunnelPut -> JE.Value
+encodeFunnelPut { name, limit, color, emoji, id } =
+    JE.object [ ( "name", JE.string name ), ( "limit", JE.float limit ), ( "color", JE.string color ), ( "emoji", JE.string emoji ), ( "id", JE.string id ) ]
 
 
 type alias Spending =
