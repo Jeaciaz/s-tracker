@@ -8,3 +8,7 @@ input =
 iconButton : String
 iconButton =
     "active:text-accent"
+
+skeleton : String
+skeleton =
+    "bg-gray-200 dark:bg-gray-600 rounded-full animate-pulse"

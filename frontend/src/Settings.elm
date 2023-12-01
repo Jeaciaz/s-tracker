@@ -27,7 +27,7 @@ init : String -> Data.User -> ( Model, List (Effect Msg) )
 init url user =
     ( { baseUrl = url
       , user = user
-      , funnels = RD.NotAsked
+      , funnels = RD.Loading
       }
     , [ Effect.Local <| Effect.FetchFunnels url user GotFunnels ]
     )
@@ -117,11 +117,27 @@ view model =
             div []
                 [ h2 [ class "text-2xl tracking-wide mb-4" ] [ text "Funnels" ]
                 , Effect.foldResponse
+                    viewFunnelsSkeleton
                     viewFunnels
                     model.funnels
                 , button [ HE.onClick CreateFunnel, class "mt-8 border w-full flex justify-center active:bg-slate-600 rounded py-2" ] [ Icons.plus ]
                 ]
         }
+
+
+viewFunnelsSkeleton : Html msg
+viewFunnelsSkeleton =
+    div [ class "flex flex-col gap-4" ] <|
+        List.concat <|
+            List.repeat 3
+                [ div [ class "flex gap-2 pb-2 relative" ]
+                    [ div [ class Clsx.skeleton, class "w-6 h-6" ] []
+                    , div [ class Clsx.skeleton, class "w-20 h-6" ] []
+                    , div [ class Clsx.skeleton, class "w-6 h-6 ms-auto" ] []
+                    , div [ class Clsx.skeleton, class "w-6 h-6" ] []
+                    , div [ class Clsx.skeleton, class "absolute bottom-0 h-px w-full" ] []
+                    ]
+                ]
 
 
 viewFunnels : Data.Funnels -> Html Msg

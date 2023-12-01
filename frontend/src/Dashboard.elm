@@ -219,6 +219,7 @@ view model =
                     ]
                     []
                 , Effect.foldResponse
+                    (div [ class Clsx.skeleton, class "h-10" ] [])
                     (\funnels ->
                         div [ class "grid grid-cols-2" ] <|
                             List.map
@@ -238,9 +239,24 @@ view model =
         }
 
 
+viewFunnelsSkeleton : Html msg
+viewFunnelsSkeleton =
+    div [ class "grid grid-cols-12 gap-4 items-end" ] <|
+        List.concat <|
+            List.repeat 3
+                [ div [ class Clsx.skeleton, class "col-span-2 h-6" ] []
+                , div [ class "col-span-8" ]
+                    [ div [ class Clsx.skeleton, class "h-4 mb-1 w-20 m-auto" ] []
+                    , div [ class Clsx.skeleton, class "h-1" ] []
+                    ]
+                , div [ class Clsx.skeleton, class "col-span-2 h-6" ] []
+                ]
+
+
 viewFunnels : Model -> Html Msg
 viewFunnels model =
     Effect.foldResponse
+        viewFunnelsSkeleton
         (\funnels ->
             div [ class "grid grid-cols-12 gap-2 items-end" ]
                 (funnels
@@ -285,46 +301,63 @@ viewFunnels model =
         model.funnels
 
 
+viewSpendingsSkeleton : Html msg
+viewSpendingsSkeleton =
+    div [] <|
+        List.concat <|
+            List.repeat 9 <|
+                [ div [ class "flex gap-2 py-4 relative" ]
+                    [ div [ class Clsx.skeleton, class "h-4 w-4" ] []
+                    , div [ class Clsx.skeleton, class "h-4 w-20" ] []
+                    , div [ class Clsx.skeleton, class "ms-auto h-4 w-40" ] []
+                    , div [ class Clsx.skeleton, class "absolute bottom-0 h-px w-full" ] []
+                    ]
+                ]
+
+
 viewSpendings : Model -> Html Msg
 viewSpendings model =
-    Effect.foldResponse
-        (\( funnels, spendings ) ->
-            div [ class "relative grow" ]
-                [ div [ class "absolute inset-0 overflow-y-auto flex flex-col" ]
-                    (List.reverse <|
-                        List.map
-                            (\spending ->
-                                let
-                                    emoji =
-                                        List.foldl (\el acc -> Dict.insert el.id el.emoji acc) Dict.empty funnels
-                                            |> Dict.get spending.funnelId
-                                            |> Maybe.withDefault ":("
+    div [ class "relative grow" ]
+        [ div [ class "absolute inset-0 overflow-y-auto flex flex-col" ]
+            [ Effect.foldResponse
+                viewSpendingsSkeleton
+                (\( funnels, spendings ) ->
+                    div [] <|
+                        (List.reverse <|
+                            List.map
+                                (\spending ->
+                                    let
+                                        emoji =
+                                            List.foldl (\el acc -> Dict.insert el.id el.emoji acc) Dict.empty funnels
+                                                |> Dict.get spending.funnelId
+                                                |> Maybe.withDefault ":("
 
-                                    date =
-                                        spending.timestamp
-                                            |> Time.millisToPosix
-                                            |> Date.fromPosix model.tz
-                                            |> Date.format "dd.MM.y"
+                                        date =
+                                            spending.timestamp
+                                                |> Time.millisToPosix
+                                                |> Date.fromPosix model.tz
+                                                |> Date.format "dd.MM.y"
 
-                                    formatTimeUnit unit =
-                                        unit |> String.fromInt |> String.padLeft 2 '0'
+                                        formatTimeUnit unit =
+                                            unit |> String.fromInt |> String.padLeft 2 '0'
 
-                                    time =
-                                        spending.timestamp
-                                            |> Time.millisToPosix
-                                            |> (\t -> formatTimeUnit (Time.toHour model.tz t) ++ ":" ++ formatTimeUnit (Time.toMinute model.tz t))
+                                        time =
+                                            spending.timestamp
+                                                |> Time.millisToPosix
+                                                |> (\t -> formatTimeUnit (Time.toHour model.tz t) ++ ":" ++ formatTimeUnit (Time.toMinute model.tz t))
 
-                                    datetime =
-                                        time ++ ", " ++ date
-                                in
-                                div [ class "flex gap-2 py-4 border-b border-slate-300 dark:border-slate-500" ]
-                                    [ div [] [ text emoji ]
-                                    , div [] [ text (Utils.formatFloat spending.amount) ]
-                                    , div [ class "ms-auto" ] [ text datetime ]
-                                    ]
-                            )
-                            spendings
-                    )
-                ]
-        )
-        (RD.map2 (\a b -> ( a, b )) model.funnels model.spendings)
+                                        datetime =
+                                            time ++ ", " ++ date
+                                    in
+                                    div [ class "flex gap-2 py-4 border-b border-slate-300 dark:border-slate-500" ]
+                                        [ div [] [ text emoji ]
+                                        , div [] [ text (Utils.formatFloat spending.amount) ]
+                                        , div [ class "ms-auto" ] [ text datetime ]
+                                        ]
+                                )
+                                spendings
+                        )
+                )
+                (RD.map2 (\a b -> ( a, b )) model.funnels model.spendings)
+            ]
+        ]

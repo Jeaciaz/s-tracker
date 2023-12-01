@@ -31,14 +31,14 @@ type alias ResponseData res =
     RD.RemoteData ResponseError res
 
 
-foldResponse : (a -> Html msg) -> ResponseData a -> Html msg
-foldResponse render model =
+foldResponse : Html msg -> (a -> Html msg) -> ResponseData a -> Html msg
+foldResponse renderLoader render model =
     case model of
         RD.NotAsked ->
             div [] []
 
         RD.Loading ->
-            div [] []
+            div [] [ renderLoader ]
 
         RD.Failure _ ->
             div [] [ text "error" ]
