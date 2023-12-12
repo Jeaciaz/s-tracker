@@ -1,5 +1,4 @@
 from uuid import uuid4, UUID
-from datetime import datetime
 from pydantic.color import Color
 
 import sqlalchemy as sa
@@ -45,6 +44,7 @@ class FunnelDAO(BaseDAO):
             if str(spending.funnel_id) == row["id"]
         ]
         remaining = row["limit"] - sum(spendings)
+        print(get_current_period_remaining_days(), get_current_period_length())
         return FunnelPublic(
             **row
             | {

@@ -126,6 +126,14 @@ type alias Spending =
     { amount : Float
     , timestamp : Int
     , funnelId : String
+    , id : String
+    }
+
+
+type alias SpendingCreate =
+    { amount : Float
+    , timestamp : Int
+    , funnelId : String
     }
 
 
@@ -139,7 +147,7 @@ type alias Spendings =
     List Spending
 
 
-addTsToSpending : Int -> SpendingCreateWithoutTs -> Spending
+addTsToSpending : Int -> SpendingCreateWithoutTs -> SpendingCreate
 addTsToSpending timestamp { amount, funnelId } =
     { amount = amount, funnelId = funnelId, timestamp = timestamp }
 
@@ -147,14 +155,15 @@ addTsToSpending timestamp { amount, funnelId } =
 decodeSpendings : JD.Decoder Spendings
 decodeSpendings =
     JD.list
-        (JD.map3 Spending
+        (JD.map4 Spending
             (JD.field "amount" JD.float)
             (JD.field "timestamp" JD.int)
             (JD.field "funnel_id" JD.string)
+            (JD.field "id" JD.string)
         )
 
 
-encodeSpending : Spending -> JE.Value
+encodeSpending : SpendingCreate -> JE.Value
 encodeSpending { amount, timestamp, funnelId } =
     JE.object
         [ ( "amount", JE.float amount )

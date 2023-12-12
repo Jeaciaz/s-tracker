@@ -70,6 +70,7 @@ type LocalEffect msgOnSuccess
     | UpdateFunnel String User Data.FunnelPut (ResponseData () -> msgOnSuccess)
     | DeleteFunnel String User String (ResponseData () -> msgOnSuccess)
     | CreateFunnel String User Data.FunnelPost (ResponseData String -> msgOnSuccess)
+    | DeleteSpending String User String (ResponseData () -> msgOnSuccess)
 
 
 type GlobalEffect msgOnSuccess
@@ -189,6 +190,8 @@ mapLocalEffect f effect =
         CreateFunnel baseUrl user funnel genMsg ->
             CreateFunnel baseUrl user funnel (genMsg >> f)
 
+        DeleteSpending baseUrl user spendingId genMsg ->
+            DeleteSpending baseUrl user spendingId (genMsg >> f)
 
 mapGlobalEffect : (a -> b) -> GlobalEffect a -> GlobalEffect b
 mapGlobalEffect f effect =
@@ -322,6 +325,15 @@ runLocalEffect effect =
                 , headers = [ Data.getAuthHeader user ]
                 , url = baseUrl ++ "/funnel/"
                 , decoder = JsonDecoder JD.string
+                }
+                |> Task.perform genMsg
+
+        DeleteSpending baseUrl user spendingId genMsg ->
+            requestTask
+                { method = Delete Http.emptyBody
+                , headers = [ Data.getAuthHeader user ]
+                , url = baseUrl ++ "/spending/" ++ spendingId
+                , decoder = StaticValue ()
                 }
                 |> Task.perform genMsg
 

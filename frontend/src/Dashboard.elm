@@ -23,7 +23,7 @@ import Utils
 type alias Model =
     { delta : String
     , funnels : Effect.ResponseData Funnels
-    , spendings : Effect.ResponseData Spendings
+    , spendings : Effect.ResponseData D.Spendings
     , tz : Time.Zone
     , baseUrl : String
     , user : D.User
@@ -45,17 +45,6 @@ type alias Funnels =
     List Funnel
 
 
-type alias Spending =
-    { amount : Float
-    , timestamp : Int
-    , funnelId : String
-    }
-
-
-type alias Spendings =
-    List Spending
-
-
 init : String -> D.User -> ( Model, List (Effect Msg) )
 init baseUrl user =
     ( { delta = ""
@@ -74,12 +63,14 @@ init baseUrl user =
 type Msg
     = UpdateDelta String
     | FunnelsResponse (Effect.ResponseData Funnels)
-    | SpendingsResponse (Effect.ResponseData Spendings)
+    | SpendingsResponse (Effect.ResponseData D.Spendings)
     | AdjustTimeZone Time.Zone
     | CreateSpending String
     | ErrorCreateSpending { amount : Float, funnelId : String } Bool Effect.ResponseError
     | ReloadData
     | GotoSettings
+    | PromptDeleteSpending D.Spending
+    | SpendingDeleteResponse String (Effect.ResponseData ())
 
 
 update : Msg -> Model -> ( Model, List (Effect Msg) )
@@ -90,6 +81,9 @@ update msg model =
 
         fetchSpendingsEffect user =
             Effect.Local <| Effect.FetchSpendings model.baseUrl user SpendingsResponse
+
+        deleteSpendingsEffect id user =
+            Effect.Local <| Effect.DeleteSpending model.baseUrl user id (SpendingDeleteResponse id)
 
         onCreateSpending req shouldRetryOnInvalidToken data =
             case data of
@@ -181,6 +175,25 @@ update msg model =
 
         GotoSettings ->
             ( model, [ Effect.Global <| Effect.GotoRoute model.user Route.Settings ] )
+
+        PromptDeleteSpending spending ->
+            ( model
+            , [ Effect.Global <|
+                    Effect.Prompt ("Are you sure you want to delete this spending of " ++ String.fromFloat spending.amount ++ "?")
+                        (deleteSpendingsEffect spending.id model.user)
+              ]
+            )
+
+        SpendingDeleteResponse id response ->
+            case response of
+                RD.Failure Effect.InvalidToken ->
+                    ( model, [ Effect.Global <| Effect.RevalidateToken model.baseUrl model.user (deleteSpendingsEffect id) ] )
+
+                RD.Failure (Effect.Other detail) ->
+                    ( model, [ Effect.Global <| Effect.Alert detail ] )
+
+                _ ->
+                    ( model, [ fetchSpendingsEffect model.user, fetchFunnelsEffect model.user ] )
 
 
 
@@ -349,7 +362,10 @@ viewSpendings model =
                                         datetime =
                                             time ++ ", " ++ date
                                     in
-                                    div [ class "flex gap-2 py-4 border-b border-slate-300 dark:border-slate-500" ]
+                                    div
+                                        [ class "flex gap-2 py-4 border-b border-slate-300 dark:border-slate-500 active:backdrop-invert backdrop-opacity-10"
+                                        , onClick (PromptDeleteSpending spending)
+                                        ]
                                         [ div [] [ text emoji ]
                                         , div [] [ text (Utils.formatFloat spending.amount) ]
                                         , div [ class "ms-auto" ] [ text datetime ]
