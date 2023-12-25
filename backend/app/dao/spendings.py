@@ -23,6 +23,7 @@ class SpendingDAO(BaseDAO):
             timestamp_from = get_current_period_start()
         if timestamp_to is None:
             timestamp_to = ms_timestamp(datetime.now())
+        print("from", timestamp_from)
 
         query = (
             sa.select(spendings_table)

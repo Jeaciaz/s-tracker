@@ -9,7 +9,7 @@ PERIOD_BREAKPOINT = 15
 def clamp_month(month: int, year: int) -> Tuple[int, int]:
     """Returns new month and a delta for the year"""
     if month % 12 == 0:
-        return 12, year + 1
+        return 12, year
     return month % 12, year + math.floor(month / 12)
 
 
@@ -26,6 +26,7 @@ def get_current_period_start(dt: datetime = datetime.now()):
         month=new_month,
         day=PERIOD_BREAKPOINT,
     )
+    print(dt)
     return ms_timestamp(dt)
 
 
