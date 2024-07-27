@@ -1,4 +1,4 @@
-FROM theasp/clojurescript-nodejs:shadow-cljs as builder
+FROM node:alpine as builder
 
 WORKDIR /frontend
 COPY package.json package-lock.json ./
